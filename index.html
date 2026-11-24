@@ -178,7 +178,7 @@
 
     /* Guide Hint */
     #hint-tip {
-      position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 15;
+      position: fixed; top: 104px; left: 50%; transform: translateX(-50%); z-index: 15;
       font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.92);
       background: rgba(18, 24, 38, 0.78); backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -242,9 +242,10 @@
         <span class="streak-pill" id="streak-pill">🔥 0 连击</span>
       </div>
       <div class="best-row">
-        <span>单次最高: <b id="best-shot">0</b></span>
+        <span>最高单次: <b id="best-shot">0</b></span>
         <span>最高连击: <b id="best-streak">0</b></span>
         <span>倒立: <b id="cap-num">0</b></span>
+        <span>远征: <b id="dist-num">0.0m</b></span>
       </div>
     </div>
 
@@ -258,10 +259,10 @@
 
   <div class="skin-bar" id="skin-bar">
     <button class="skin-btn active" data-skin="studio">📷 写实原木</button>
-    <button class="skin-btn" data-skin="mac">🍎 麦金塔 1-Bit</button>
+    <button class="skin-btn" data-skin="mac">🍎 麦金塔 Atkinson</button>
+    <button class="skin-btn" data-skin="halftone">📰 波普网点</button>
     <button class="skin-btn" data-skin="ascii">💻 极客 ASCII</button>
-    <button class="skin-btn" data-skin="gb">👾 复古掌机</button>
-    <button class="skin-btn" data-skin="crt">🌆 赛博 CRT</button>
+    <button class="skin-btn" data-skin="gb">👾 掌机 Floyd</button>
   </div>
 
   <div id="phys-hud">
@@ -290,12 +291,12 @@
         <div class="r-item"><b>2. 空翻周数倍率</b>：1周(360°) <b>×1.0</b> · 1.5周 <b>×1.8</b> · 2周(720°) <b>×2.6</b> · 3周(1080°) <b>×5.0</b> · 4周+ <b>×8.5</b></div>
         <div class="r-item"><b>3. 水量极限难度</b>：25%~45%黄金区 <b>×1.0</b> · 15%~20%/50%~65% <b>×1.4</b> · 5%~10%/70%~80% <b>×2.2</b> · <b>85%~95%满水 ×3.0</b> · <b>0%纯空瓶 ×3.5</b>！</div>
         <div class="r-item"><b>4. 瓶型难度系数</b>：🥛草莓牛奶 <b>×0.9</b> · 💧农夫山泉 <b>×1.0</b> · 🥤可口可乐 <b>×1.2</b> · 🍾玻璃汽水(高弹窄盖) <b>×1.5</b></div>
-        <div class="r-item"><b>5. 桌面特技与连击</b>：🎯 <b>正中软木杯垫 ×1.4</b> · ⚡ <b>零晃动垂直秒稳 ×1.3</b> · ⚖️ <b>边缘达摩摇晃救回 ×1.5</b> · 每连击额外 <b>+20%</b>（最高 ×3.0）！</div>
+        <div class="r-item"><b>5. 无尽桌面特技与连击</b>：🎯 <b>正中软木杯垫(每6米一垫) ×1.4</b> · 🚀 <b>远征靶垫 ×1.2</b> · ⚡ <b>零晃动垂直秒稳 ×1.3</b> · ⚖️ <b>达摩摇晃救回 ×1.5</b> · 每连击 <b>+20%</b>！</div>
       </div>
     </div>
   </div>
 
-  <div id="hint-tip">👆 按住任意位置向上拖拽抛瓶（瞄准桌面中央杯垫得分更高 · 躺倒也能直接挑起）</div>
+  <div id="hint-tip">👆 按住任意位置向上拖拽抛瓶（无空气墙无限平地 · 每 6 米设有软木靶垫 · 躺倒也能直接挑起）</div>
 
   <div class="dock">
     <div class="water-ctrl">
@@ -1857,6 +1858,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
 
   let sfxEnabled = true;
   let actx = null;
+  let noiseBuf = null;
   function ensureAudio() {
     if (!sfxEnabled) return null;
     if (!actx) {
@@ -1864,80 +1866,166 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
       if (AC) actx = new AC();
     }
     if (actx && actx.state === 'suspended') actx.resume();
+    if (actx && !noiseBuf) {
+      const sr = actx.sampleRate;
+      const len = Math.floor(sr * 1.5);
+      noiseBuf = actx.createBuffer(1, len, sr);
+      const ch = noiseBuf.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        b0 = 0.997 * b0 + w * 0.029;
+        b1 = 0.985 * b1 + w * 0.032;
+        b2 = 0.950 * b2 + w * 0.048;
+        ch[i] = Math.max(-1, Math.min(1, (b0 + b1 + b2 + w * 0.18) * 1.45));
+      }
+    }
     return actx;
   }
 
-  function playWhoosh(power) {
-    const c = ensureAudio(); if (!c) return;
-    const now = c.currentTime;
-    const osc = c.createOscillator(), g = c.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(160 + power * 90, now);
-    osc.frequency.exponentialRampToValueAtTime(420 + power * 180, now + 0.14);
-    g.gain.setValueAtTime(0.001, now);
-    g.gain.linearRampToValueAtTime(0.15, now + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-    osc.connect(g); g.connect(c.destination);
-    osc.start(now); osc.stop(now + 0.2);
+  function playNoiseBurst(c, startT, dur, filterType, freq0, freq1, qVal, peakGain) {
+    if (!noiseBuf || peakGain <= 0.0005) return;
+    const src = c.createBufferSource();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    const flt = c.createBiquadFilter();
+    flt.type = filterType;
+    flt.Q.setValueAtTime(qVal, startT);
+    flt.frequency.setValueAtTime(Math.max(40, freq0), startT);
+    if (freq1 !== freq0) {
+      flt.frequency.exponentialRampToValueAtTime(Math.max(40, freq1), startT + dur);
+    }
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0008, startT);
+    g.gain.linearRampToValueAtTime(peakGain, startT + Math.min(0.018, dur * 0.22));
+    g.gain.exponentialRampToValueAtTime(0.0008, startT + dur);
+    src.connect(flt); flt.connect(g); g.connect(c.destination);
+    const offset = Math.random() * 1.1;
+    src.start(startT, offset, dur + 0.02);
   }
 
-  let lastThudMs = 0;
-  function playThud(impulse, isGlass) {
-    const nowMs = performance.now();
-    if (nowMs - lastThudMs < 50 || impulse < 0.70) return;
-    lastThudMs = nowMs;
+  function playWhoosh(power, omega = 6) {
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
-    const strength = Math.min(1.0, impulse / 9.0);
-
-    if (isGlass) {
-      [740, 1580].forEach((f, idx) => {
+    const spinBoost = Math.min(1.4, Math.abs(omega) / 8.5);
+    // 1. Realistic filtered air-cut swish (replaces synthetic sine beep!)
+    playNoiseBurst(c, now, 0.21, 'bandpass', 190 + power * 110, 560 + power * 380 * spinBoost, 1.5, 0.14 * (0.45 + power * 0.55));
+    // 2. Internal water surge / slosh swish on flick
+    if (waterPct >= 6 && waterPct <= 92) {
+      const sloshAmt = Math.max(0.25, 1.0 - Math.abs(waterPct - 40) / 58);
+      playNoiseBurst(c, now + 0.02, 0.19, 'bandpass', 360, 880 + power * 260, 4.2, 0.095 * sloshAmt);
+      // Subtle resonant liquid droplet formants
+      [740, 1080].forEach((bf, idx) => {
         const osc = c.createOscillator(), g = c.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(f + strength * 60, now);
-        osc.frequency.exponentialRampToValueAtTime(f * 0.92, now + 0.11);
-        g.gain.setValueAtTime(strength * (idx === 0 ? 0.22 : 0.10), now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + (idx === 0 ? 0.12 : 0.08));
+        const t0 = now + 0.03 + idx * 0.038;
+        osc.frequency.setValueAtTime(bf, t0);
+        osc.frequency.exponentialRampToValueAtTime(bf * 1.42, t0 + 0.055);
+        g.gain.setValueAtTime(0.0005, t0);
+        g.gain.linearRampToValueAtTime(0.022 * sloshAmt, t0 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.06);
         osc.connect(g); g.connect(c.destination);
-        osc.start(now); osc.stop(now + 0.13);
+        osc.start(t0); osc.stop(t0 + 0.065);
       });
-    } else {
-      // Wood desk thump + hollow PET plastic shell resonance
-      const thump = c.createOscillator(), tg = c.createGain();
-      thump.type = 'sine';
-      thump.frequency.setValueAtTime(155 + strength * 85, now);
-      thump.frequency.exponentialRampToValueAtTime(50, now + 0.085);
-      tg.gain.setValueAtTime(strength * 0.25, now);
-      tg.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
-      thump.connect(tg); tg.connect(c.destination);
-      thump.start(now); thump.stop(now + 0.10);
-
-      const shell = c.createOscillator(), sg = c.createGain();
-      shell.type = 'triangle';
-      const hollowHz = waterPct < 15 ? 650 : 485;
-      shell.frequency.setValueAtTime(hollowHz + strength * 140, now);
-      shell.frequency.exponentialRampToValueAtTime(hollowHz * 0.62, now + 0.055);
-      sg.gain.setValueAtTime(strength * 0.12, now);
-      sg.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-      shell.connect(sg); sg.connect(c.destination);
-      shell.start(now); shell.stop(now + 0.065);
     }
   }
 
-  function playWin(isHighTier) {
+  let lastThudMs = 0;
+  function playThud(impulse, isGlass, isFlatBase = false) {
+    const nowMs = performance.now();
+    if (nowMs - lastThudMs < 42 || impulse < 0.42) return;
+    lastThudMs = nowMs;
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
-    const notes = isHighTier ? [523.25, 659.25, 783.99, 1046.5, 1318.5] : [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((f, i) => {
-      const osc = c.createOscillator(), g = c.createGain();
-      osc.type = skinMode === 'gb' || skinMode === 'mac' ? 'square' : 'triangle';
-      const vol = skinMode === 'gb' || skinMode === 'mac' ? 0.09 : 0.18;
-      osc.frequency.setValueAtTime(f, now + i * 0.065);
-      g.gain.setValueAtTime(0.001, now + i * 0.065);
-      g.gain.linearRampToValueAtTime(vol, now + i * 0.065 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.065 + 0.28);
-      osc.connect(g); g.connect(c.destination);
-      osc.start(now + i * 0.065); osc.stop(now + i * 0.065 + 0.3);
+    const strength = Math.min(1.0, impulse / 8.2);
+
+    // 1. Solid Oak Tabletop Knock (wood surface transient + warm board body resonance)
+    playNoiseBurst(c, now, isFlatBase ? 0.026 : 0.018, 'bandpass', isFlatBase ? 520 : 780, 260, 1.3, strength * (isFlatBase ? 0.26 : 0.16));
+    const wood = c.createOscillator(), wg = c.createGain();
+    wood.type = 'sine';
+    wood.frequency.setValueAtTime((isFlatBase ? 132 : 168) + strength * 48, now);
+    wood.frequency.exponentialRampToValueAtTime(isFlatBase ? 44 : 56, now + (isFlatBase ? 0.11 : 0.075));
+    wg.gain.setValueAtTime(strength * (isFlatBase ? 0.34 : 0.20), now);
+    wg.gain.exponentialRampToValueAtTime(0.0008, now + (isFlatBase ? 0.12 : 0.085));
+    wood.connect(wg); wg.connect(c.destination);
+    wood.start(now); wood.stop(now + 0.13);
+
+    // 2. Bottle Shell Modal Acoustics (Crystal Glass Clink vs Water-Loaded PET Plastic)
+    if (isGlass) {
+      const modes = [[1260, 0.16, 0.15], [2710, 0.085, 0.11], [4240, 0.045, 0.07]];
+      modes.forEach(([f, amp, dur]) => {
+        const osc = c.createOscillator(), g = c.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f + strength * 35, now);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.985, now + dur);
+        g.gain.setValueAtTime(strength * amp, now);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(now); osc.stop(now + dur + 0.01);
+      });
+    } else {
+      // PET shell modal resonance shifts downward with water mass + crisp crinkle on empty/light bottles
+      const petBaseHz = 615 - waterPct * 3.15;
+      const dampDur = isFlatBase ? 0.048 : 0.072;
+      [1.0, 1.58].forEach((ratio, idx) => {
+        const osc = c.createOscillator(), g = c.createGain();
+        osc.type = idx === 0 ? 'triangle' : 'sine';
+        const f0 = petBaseHz * ratio;
+        osc.frequency.setValueAtTime(f0 + strength * 65, now);
+        osc.frequency.exponentialRampToValueAtTime(f0 * 0.68, now + dampDur);
+        const hollowBoost = waterPct < 20 ? 1.45 : (waterPct > 70 ? 0.55 : 0.85);
+        g.gain.setValueAtTime(strength * (idx === 0 ? 0.11 : 0.05) * hollowBoost, now);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + dampDur);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(now); osc.stop(now + dampDur + 0.01);
+      });
+      if (waterPct < 45 && strength > 0.25) {
+        playNoiseBurst(c, now + 0.003, 0.028, 'highpass', 2350, 1800, 0.9, strength * 0.055 * (1 - waterPct / 65));
+      }
+    }
+
+    // 3. Post-Impact Internal Liquid Slosh ("哗啦~" glug right after hitting the desk!)
+    if (waterPct >= 8 && waterPct <= 90 && impulse > 1.15) {
+      const sloshFactor = Math.max(0.2, 1.0 - Math.pow((waterPct - 38) / 48, 2));
+      playNoiseBurst(c, now + 0.022, 0.165, 'bandpass', 920, 370, 3.6, strength * 0.13 * sloshFactor);
+    }
+  }
+
+  function playWin(isHighTier, curStreak = 1, isCap = false) {
+    const c = ensureAudio(); if (!c) return;
+    const now = c.currentTime;
+    const semiShift = Math.min(7, Math.max(0, curStreak - 1));
+    const pitchMul = Math.pow(2, semiShift / 12);
+    const baseNotes = isCap
+      ? [523.25, 659.25, 783.99, 987.77, 1174.66, 1567.98]
+      : (isHighTier ? [440, 554.37, 659.25, 830.61, 987.77] : [440, 554.37, 659.25, 880]);
+    const isRetro = skinMode === 'gb';
+
+    baseNotes.forEach((rawF, i) => {
+      const f = rawF * pitchMul;
+      const t0 = now + i * 0.055;
+      if (isRetro) {
+        const osc = c.createOscillator(), g = c.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(f, t0);
+        g.gain.setValueAtTime(0.001, t0);
+        g.gain.linearRampToValueAtTime(0.075, t0 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0008, t0 + 0.24);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(t0); osc.stop(t0 + 0.26);
+      } else {
+        // Warm Wooden Marimba + Rhodes Bell Overtones
+        [[1.0, 0.16, 0.38], [2.0, 0.045, 0.18], [3.0, 0.022, 0.09]].forEach(([harm, amp, dur]) => {
+          const osc = c.createOscillator(), g = c.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f * harm, t0);
+          g.gain.setValueAtTime(0.0008, t0);
+          g.gain.linearRampToValueAtTime(amp, t0 + 0.008);
+          g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+          osc.connect(g); g.connect(c.destination);
+          osc.start(t0); osc.stop(t0 + dur + 0.015);
+        });
+      }
     });
   }
 
@@ -1971,8 +2059,8 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     }
   };
 
-  const SKINS = ['studio', 'mac', 'ascii', 'gb', 'crt'];
-  const SKIN_NAMES = { studio: '📷 写实', mac: '🍎 麦金塔', ascii: '💻 ASCII', gb: '👾 掌机', crt: '🌆 CRT' };
+  const SKINS = ['studio', 'mac', 'halftone', 'ascii', 'gb'];
+  const SKIN_NAMES = { studio: '📷 写实', mac: '🍎 麦金塔', halftone: '📰 波普网点', ascii: '💻 ASCII', gb: '👾 掌机' };
 
   let renderOnce = () => {};
   const spriteCache = {};
@@ -2001,14 +2089,15 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
   const urlParams = new URLSearchParams(location.search);
   let widgetMode = urlParams.get('widget') === '1';
   let transparentBg = urlParams.get('transparent') === '1';
-  let skinMode = Store.get('bf_skin', 'studio');
+  let skinMode = urlParams.get('skin') || Store.get('bf_skin', 'studio');
   if (!SKINS.includes(skinMode)) skinMode = 'studio';
   if (widgetMode) document.body.classList.add('widget-mode');
   if (transparentBg) document.documentElement.classList.add('transparent-bg');
 
-  let world = null, bottleBody = null, particleSystem = null;
-  let deskHalfW = 8.2;
-  const COASTER_HALF_W = 0.62; // Target cork coaster at x = 0!
+  let world = null, groundBody = null, bottleBody = null, particleSystem = null;
+  let groundCenterX = 0;
+  const COASTER_HALF_W = 0.62;
+  const COASTER_SPACING = 6.0; // Target cork coaster every 6 meters across the infinite flatland!
   let bottleKey = 'water';
   let waterPct = 35;
   let xrayMode = false;
@@ -2018,6 +2107,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
   let streak = 0;
   let bestStreak = Store.get('bf_best_streak', 0);
   let capCount = Store.get('bf_cap_count', 0);
+  let maxExpeditionM = Store.get('bf_max_dist', 0);
 
   // Flight & precision tracking
   let state = 'ready'; // 'ready' | 'flying'
@@ -2046,7 +2136,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
   }));
 
   let camX = 0, camY = 1.52, camZoom = 1.0;
-  let targetCamX = 0, targetCamY = 1.52;
+  let targetCamX = 0, targetCamY = 1.52, targetCamZoom = 1.0;
 
   let dragging = false;
   let dragStart = { x: 0, y: 0 }, dragCur = { x: 0, y: 0 };
@@ -2068,6 +2158,8 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     document.getElementById('best-shot').textContent = bestShot.toLocaleString();
     document.getElementById('best-streak').textContent = bestStreak;
     document.getElementById('cap-num').textContent = capCount;
+    const distEl = document.getElementById('dist-num');
+    if (distEl) distEl.textContent = `${maxExpeditionM.toFixed(1)}m`;
     const wbSt = document.getElementById('wb-streak-num');
     const wbSc = document.getElementById('wb-score-num');
     if (wbSt) wbSt.textContent = streak;
@@ -2117,25 +2209,21 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     return b;
   }
 
-  function rebuildWorld() {
+  function rebuildWorld(keepCurrentCoaster = false) {
+    const prevX = (keepCurrentCoaster && bottleBody)
+      ? Math.round(bottleBody.GetPosition().x / COASTER_SPACING) * COASTER_SPACING
+      : 0;
+
     world = new b2World(new b2Vec2(0, -16.8));
     window.world = world;
 
-    const estPpm = Math.max(60, Math.min(window.innerWidth, window.innerHeight) * 0.158);
-    deskHalfW = widgetMode
-      ? Math.max(2.05, (window.innerWidth / estPpm) * 0.47)
-      : Math.max(5.8, (window.innerWidth / estPpm) * 0.48);
-
-    // Desk restitution = 0.0 so Box2D max(r_bottle, r_desk) uses each bottle part's EXACT restitution
-    // (0.02 dead-blow base for crisp upright sticking, 0.28..0.38 elastic body/shoulders for realistic side bounces!)
-    addStaticBox(0, -0.5, deskHalfW + 1.2, 0.5, 0.88, 0.0);
-    // Elastic side boundary walls + high ceiling so hard throws rebound onto the desk naturally
-    addStaticBox(-(deskHalfW + 0.35), 5.0, 0.35, 8.0, 0.30, 0.44);
-    addStaticBox( (deskHalfW + 0.35), 5.0, 0.35, 8.0, 0.30, 0.44);
-    addStaticBox(0, 12.0, deskHalfW + 1.2, 0.4, 0.30, 0.32);
+    // Boundless Infinite Flatland ("大平地"): ZERO side air walls, ZERO ceiling!
+    // 800m-wide static slab that recenters seamlessly around the bottle as you explore (-∞, +∞).
+    groundCenterX = prevX;
+    groundBody = addStaticBox(groundCenterX, -0.5, 400.0, 0.5, 0.88, 0.0);
 
     const spawnY = BOTTLES[bottleKey].halfH + 0.01;
-    createBottleAndWater(0, spawnY);
+    createBottleAndWater(prevX, spawnY);
 
     state = 'ready';
     settleTimer = 0;
@@ -2153,8 +2241,9 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     prevRenderAng = currRenderAng = bottleBody.GetAngle();
     renderAlpha = 1.0;
 
-    targetCamX = 0;
-    targetCamY = widgetMode ? 1.46 : 1.52;
+    camX = targetCamX = prevX;
+    camY = targetCamY = widgetMode ? 1.44 : 1.52;
+    camZoom = targetCamZoom = 1.0;
     updateHudNumbers();
     renderOnce();
   }
@@ -2167,6 +2256,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     bd.type = b2_dynamicBody;
     bd.position.Set(cx, cy);
     bd.bullet = true;
+    bd.allowSleep = false; // Never freeze mid-wobble at an unstable balance apex!
     bd.linearDamping = 0.015;
     bd.angularDamping = 0.038;
     bottleBody = world.CreateBody(bd);
@@ -2266,14 +2356,15 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
   function canGrabBottle() {
     if (!bottleBody) return false;
     if (state === 'ready') return true;
-    // If resting sideways on the desk after a missed throw, allow immediate re-grab;
-    // if nearly upright/cap-stand, wait the brief 0.25s settle so your score & reward ALWAYS trigger first!
-    if (performance.now() - throwTime > 320) {
+    // Only allow early re-grab if clearly lying sideways (> 64°) and slow — NEVER interrupt an active upright/edge wobble!
+    if (performance.now() - throwTime > 340) {
       const pos = bottleBody.GetPosition();
       const vel = bottleBody.GetLinearVelocity();
-      const ang = Math.abs(normalizeAngle(bottleBody.GetAngle()));
-      const nearStanding = ang < 0.35 || Math.abs(ang - Math.PI) < 0.35;
-      if (!nearStanding && pos.y < 1.2 && Math.hypot(vel.x, vel.y) < 1.5) {
+      const av = bottleBody.GetAngularVelocity();
+      const absA = Math.abs(normalizeAngle(bottleBody.GetAngle()));
+      const clearlySideways = absA > 1.12 && absA < 2.04;
+      if (clearlySideways && pos.y < 1.1 && Math.hypot(vel.x, vel.y) < 1.2 && Math.abs(av) < 1.0) {
+        state = 'ready';
         streak = 0;
         updateHudNumbers();
         return true;
@@ -2351,7 +2442,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     touchedDown = false;
     touchdownTilt = 0;
     maxWobbleTilt = 0;
-    playWhoosh(power);
+    playWhoosh(power, omega);
   }
 
   // ============================================================================
@@ -2451,35 +2542,40 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     const ang = normalizeAngle(bottleBody.GetAngle());
     const av = bottleBody.GetAngularVelocity();
     const cfg = BOTTLES[bottleKey];
+    const absA = Math.abs(ang);
+    const tiltFromVertical = Math.min(absA, Math.abs(absA - Math.PI));
 
-    // Collision audio (vertical desk thump, side-wall bounce, & corner clatter)
+    // Seamlessly shift infinite ground slab so (-∞, +∞) never loses float precision
+    if (groundBody && Math.abs(pos.x - groundCenterX) > 150) {
+      groundCenterX = pos.x;
+      groundBody.SetTransform(new b2Vec2(groundCenterX, -0.5), 0);
+    }
+
+    // Multi-layered Foley collision audio (flat base dead-blow vs side/corner bounce vs edge-wobble taps)
     const dvX = Math.abs(vel.x - prevVelX);
     const dvY = Math.max(0, vel.y - prevVelY);
     const dOm = Math.abs(av - prevOmega);
     if (performance.now() - throwTime > 45) {
-      const impact = Math.hypot(dvX > 1.2 ? dvX : 0, dvY) + (dOm > 3.2 ? dOm * 0.22 : 0);
-      if (impact > 0.90) playThud(impact, cfg.isGlass);
+      const impact = Math.hypot(dvX > 1.0 ? dvX : 0, dvY) + (dOm > 2.4 ? dOm * 0.22 : 0);
+      if (impact > 0.45 && pos.y < cfg.halfH + 0.35) {
+        playThud(impact, cfg.isGlass, tiltFromVertical < 0.28);
+      }
     }
     prevVelX = vel.x; prevVelY = vel.y; prevOmega = av;
 
-    // Camera follow
-    if (widgetMode) {
-      targetCamX = 0;
-      targetCamY = 1.46;
-    } else {
-      targetCamX = pos.x * 0.42;
-      targetCamY = Math.max(1.52, 1.15 + pos.y * 0.28);
-    }
+    // Smooth 1:1 infinite horizontal camera tracking + dynamic high-throw zoom-out
+    targetCamX = pos.x;
+    const baseCamY = widgetMode ? 1.44 : 1.50;
+    targetCamY = baseCamY + Math.max(0, pos.y - 1.35) * 0.56;
+    targetCamZoom = Math.max(0.52, Math.min(1.0, 4.3 / Math.max(4.3, pos.y + 1.35)));
 
     // Track peak air clearance & post-touchdown edge wobble for precision/recovery bonuses!
-    const absA = Math.abs(ang);
     const restingDist = Math.abs(Math.cos(absA)) * cfg.halfH + Math.abs(Math.sin(absA)) * cfg.halfW;
     const heightOffDesk = pos.y - restingDist;
     if (heightOffDesk > peakAirHeight) peakAirHeight = heightOffDesk;
 
     if (state === 'flying' && (performance.now() - throwTime > 260)) {
-      const tiltFromVertical = Math.min(absA, Math.abs(absA - Math.PI));
-      if (heightOffDesk < 0.12 && peakAirHeight > 0.18) {
+      if (heightOffDesk < 0.14 && peakAirHeight > 0.14) {
         if (!touchedDown) {
           touchedDown = true;
           touchdownTilt = tiltFromVertical;
@@ -2488,10 +2584,18 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
       }
 
       const spd = Math.hypot(vel.x, vel.y);
-      // Generous slosh-tolerant settle threshold so internal SPH ripples NEVER block upright rewards!
-      if (heightOffDesk < 0.22 && spd < 0.78 && Math.abs(av) < 1.15) {
+      // CRITICAL FIX FOR WOBBLE-APEX BUG:
+      // NEVER accumulate settleTimer while teetering at an intermediate tilt angle (8.5° .. 67°)!
+      // At the turnaround apex of a slow 18° Daruma wobble, both spd and |av| momentarily cross zero,
+      // which previously triggered premature failure BEFORE the bottle rocked back upright!
+      const stableStanding = tiltFromVertical < 0.15 && heightOffDesk < 0.15 && spd < 0.65 && Math.abs(av) < 0.85;
+      const stableSideways = (absA > 1.17 && absA < 2.02) && heightOffDesk < 0.16 && spd < 0.22 && Math.abs(av) < 0.28;
+      const safetyFallback = (performance.now() - throwTime > 12000) && heightOffDesk < 0.18 && spd < 0.05 && Math.abs(av) < 0.05;
+
+      if (stableStanding || stableSideways || safetyFallback) {
         settleTimer += realDt;
-        if (settleTimer >= 0.24) evaluateLanding(pos, ang);
+        const reqSettle = stableStanding ? 0.20 : 0.28;
+        if (settleTimer >= reqSettle) evaluateLanding(pos, ang);
       } else {
         settleTimer = 0;
       }
@@ -2510,12 +2614,19 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
       return;
     }
 
-    // Check minimum valid rotation (started sideways/inverted needs >= 65°; started upright needs >= 180° + real air height!)
+    // Check minimum valid rotation (started sideways/inverted needs >= 60°; started upright needs >= 180° + real air height!)
     const startedNonUpright = Math.abs(startAngle) > 0.55;
     const netSpin = Math.abs(cumulativeSpin);
-    const minReqSpin = startedNonUpright ? 1.05 : (isCapStand ? 2.3 : 4.2);
-    if ((netSpin < minReqSpin && totalAbsSpin < minReqSpin + 0.8) || peakAirHeight < 0.16) {
+    const minReqSpin = startedNonUpright ? 1.02 : (isCapStand ? 2.2 : 3.8);
+    if ((netSpin < minReqSpin && totalAbsSpin < minReqSpin + 0.8) || peakAirHeight < 0.12) {
       return;
+    }
+
+    // Track furthest upright expedition distance from 0m origin!
+    const distM = Math.abs(pos.x);
+    if (distM > maxExpeditionM) {
+      maxExpeditionM = +distM.toFixed(1);
+      Store.set('bf_max_dist', maxExpeditionM);
     }
 
     // ==========================================================================
@@ -2560,15 +2671,20 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
       tags.push({ text: `${cfg.name} ×${cfg.diffMult}`, cls: cfg.diffMult > 1 ? 'gold' : '' });
     }
 
-    // 5. Target Coaster & Edge-Wobble / Dead-Center Precision Bonuses
+    // 5. Repeating 6m Target Coaster & Edge-Wobble / Dead-Center Precision Bonuses
     let styleMult = 1.0;
-    if (Math.abs(pos.x) <= COASTER_HALF_W) {
+    const nearestCoasterX = Math.round(pos.x / COASTER_SPACING) * COASTER_SPACING;
+    if (Math.abs(pos.x - nearestCoasterX) <= COASTER_HALF_W) {
       styleMult *= 1.4;
       tags.push({ text: '🎯 靶心杯垫 ×1.4', cls: 'gold' });
+      if (Math.abs(nearestCoasterX) >= COASTER_SPACING) {
+        styleMult *= 1.2;
+        tags.push({ text: `🚀 ${Math.abs(nearestCoasterX)}m远征靶 ×1.2`, cls: 'cyan' });
+      }
     }
     const degWobble = maxWobbleTilt * 180 / Math.PI;
     const degTouch = touchdownTilt * 180 / Math.PI;
-    if (degWobble >= 11.0) {
+    if (degWobble >= 9.5) {
       styleMult *= 1.5;
       tags.push({ text: `⚖️ 达摩摇晃救回(${degWobble.toFixed(0)}°) ×1.5`, cls: 'pink' });
     } else if (degTouch <= 3.2) {
@@ -2591,14 +2707,14 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     Store.set('bf_total_score', totalScore);
 
     const isEpic = earned >= 450 || isCapStand || fullTurns >= 2.0;
-    playWin(isEpic);
+    playWin(isEpic, streak, isCapStand);
     spawnConfetti(pos.x, pos.y + 0.6, isEpic ? 95 : 46);
 
     const headline = isCapStand
       ? '🙃 SSS 瓶盖倒立绝杀！！'
       : (fullTurns >= 3 ? `👑 ${fullTurns}周神级空翻！！`
       : (fullTurns >= 2 ? `🔥 ${fullTurns}周空翻完美立住！`
-      : (degWobble >= 11 ? '⚖️ 悬崖勒马！摇晃立稳！' : '✨ 稳稳立住！')));
+      : (degWobble >= 9.5 ? '⚖️ 悬崖勒马！摇晃立稳！' : '✨ 稳稳立住！')));
     showScoreBanner(earned, headline, tags, isCapStand ? '#f472b6' : (earned >= 500 ? '#5eead4' : '#ffd166'));
     updateHudNumbers();
   }
@@ -2637,7 +2753,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ppm = Math.min(W, H) * 0.158;
   }
-  window.addEventListener('resize', () => { resize(); if (world) rebuildWorld(); });
+  window.addEventListener('resize', () => { resize(); renderOnce(); });
   resize();
 
   function w2s(wx, wy) {
@@ -2648,11 +2764,18 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     };
   }
 
+  function tileHash(n) {
+    let x = (n | 0) * 1597334677;
+    x = ((x ^ (x >>> 15)) * 2246822519) >>> 0;
+    return (x ^ (x >>> 13)) >>> 0;
+  }
+
   function drawBackground(nowSec) {
     if (transparentBg && !xrayMode && skinMode === 'studio') {
       ctx.clearRect(0, 0, W, H);
       return;
     }
+    const scale = ppm * camZoom;
     if (xrayMode) {
       const grad = ctx.createLinearGradient(0, 0, 0, H);
       grad.addColorStop(0, '#0b1120');
@@ -2662,139 +2785,385 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
 
       ctx.strokeStyle = 'rgba(94, 234, 212, 0.08)';
       ctx.lineWidth = 1;
-      for (let x = -12; x <= 12; x++) {
+      const gx0 = Math.floor(camX - (W * 0.6) / scale);
+      const gx1 = Math.ceil(camX + (W * 0.6) / scale);
+      for (let x = gx0; x <= gx1; x++) {
         const sx = w2s(x, 0).x;
         ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
       }
-      for (let y = -4; y <= 10; y++) {
+      for (let y = -2; y <= 16; y++) {
         const sy = w2s(0, y).y;
         ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
       }
       return;
     }
 
-    // Warm sunlit study room backdrop
+    // High-contrast studio gallery lighting for Saganaki22/Dither & ASCII skins (matches dithered-atkinson.png!)
+    const hc = skinMode !== 'studio';
     const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#f7f1e6');
-    grad.addColorStop(0.58, '#ece2d2');
-    grad.addColorStop(1, '#ddd0bc');
+    if (hc) {
+      grad.addColorStop(0, '#444954');
+      grad.addColorStop(0.55, '#383c46');
+      grad.addColorStop(1, '#2d313a');
+    } else {
+      grad.addColorStop(0, '#f7f0e4');
+      grad.addColorStop(0.58, '#ebe0cf');
+      grad.addColorStop(1, '#dacbb6');
+    }
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    if (!widgetMode) {
-      ctx.save();
-      // Subtle architectural wall wainscot & soft background shelf/frame silhouettes
-      const dadoY = w2s(0, 2.55).y;
-      ctx.fillStyle = 'rgba(186, 168, 144, 0.13)';
-      ctx.fillRect(0, dadoY, W, Math.max(0, H - dadoY));
-      ctx.strokeStyle = 'rgba(155, 136, 112, 0.22)';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(0, dadoY); ctx.lineTo(W, dadoY); ctx.stroke();
+    ctx.save();
+    const deskY = w2s(0, 0).y;
+    const dadoY = w2s(0, 2.35).y;
 
-      // Framed minimalist art print silhouette on left wall
-      const frameX = W * 0.16, frameY = Math.max(68, dadoY - 175);
-      if (W > 760) {
-        ctx.fillStyle = 'rgba(255, 252, 246, 0.55)';
-        ctx.strokeStyle = 'rgba(145, 122, 96, 0.28)';
-        ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.roundRect(frameX, frameY, 108, 136, 4); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = 'rgba(214, 162, 118, 0.26)';
-        ctx.beginPath(); ctx.arc(frameX + 54, frameY + 56, 26, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(128, 148, 132, 0.25)';
-        ctx.beginPath(); ctx.moveTo(frameX + 16, frameY + 116); ctx.lineTo(frameX + 48, frameY + 78); ctx.lineTo(frameX + 92, frameY + 116); ctx.closePath(); ctx.fill();
-      }
+    // 1. Infinite Architectural Wainscot Dado & Vertical Wall Paneling (0.22x Parallax)
+    ctx.fillStyle = hc ? 'rgba(20, 22, 28, 0.16)' : 'rgba(182, 162, 136, 0.16)';
+    ctx.fillRect(0, dadoY, W, Math.max(0, deskY - dadoY));
+    ctx.strokeStyle = hc ? 'rgba(120, 128, 144, 0.42)' : 'rgba(155, 134, 108, 0.28)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, dadoY); ctx.lineTo(W, dadoY); ctx.stroke();
 
-      // Venetian window-blind sunlight stripes + floating warm dust motes
-      const beam = ctx.createLinearGradient(W * 0.08, 0, W * 0.72, H * 0.85);
-      beam.addColorStop(0, 'rgba(255, 252, 238, 0.58)');
-      beam.addColorStop(1, 'rgba(255, 248, 225, 0.0)');
-      ctx.fillStyle = beam;
-      for (let b = 0; b < 4; b++) {
-        const x0 = W * (0.06 + b * 0.095);
-        ctx.beginPath();
-        ctx.moveTo(x0, 0); ctx.lineTo(x0 + W * 0.055, 0);
-        ctx.lineTo(x0 + W * 0.34, H); ctx.lineTo(x0 + W * 0.26, H);
-        ctx.closePath(); ctx.fill();
+    const farSpanW = W / scale;
+    const farCam = camX * 0.22;
+    const panelStep = 2.4;
+    const pStart = Math.floor((farCam - farSpanW * 0.7) / panelStep) - 1;
+    const pEnd = Math.ceil((farCam + farSpanW * 0.7) / panelStep) + 1;
+    ctx.strokeStyle = hc ? 'rgba(96, 104, 118, 0.28)' : 'rgba(162, 142, 116, 0.14)';
+    ctx.lineWidth = 1.2;
+    for (let pi = pStart; pi <= pEnd; pi++) {
+      const px = W * 0.5 + (pi * panelStep - farCam) * scale;
+      if (dadoY < deskY - 8) {
+        ctx.strokeRect(px + 8, dadoY + 10, panelStep * scale - 16, Math.max(8, deskY - dadoY - 22));
       }
-
-      ctx.fillStyle = 'rgba(255, 250, 230, 0.55)';
-      for (const m of dustMotes) {
-        const mx = ((m.x + nowSec * m.sp * 0.25) % 1) * W * 0.75 + W * 0.05;
-        const my = ((m.y - nowSec * m.sp * 0.5 + 10) % 1) * (H * 0.65);
-        ctx.beginPath(); ctx.arc(mx, my, m.r, 0, Math.PI * 2); ctx.fill();
-      }
-      ctx.restore();
     }
+
+    // 2. Far Parallax Panoramic Loft Windows + Vector Mountains/Clouds + Sunbeams (0.22x Parallax)
+    if (!widgetMode) {
+      const winStep = 8.4;
+      const winScreenXs = [];
+      const wStart = Math.floor((farCam - farSpanW * 0.7) / winStep) - 1;
+      const wEnd = Math.ceil((farCam + farSpanW * 0.7) / winStep) + 1;
+      for (let wi = wStart; wi <= wEnd; wi++) {
+        const wx = W * 0.5 + ((wi + 0.36) * winStep - farCam) * scale;
+        winScreenXs.push(wx);
+        const ww = 2.05 * scale, wh = 2.35 * scale;
+        const wy = dadoY - wh - 0.28 * scale;
+        if (wx + ww < -80 || wx - ww > W + 80) continue;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(wx - ww * 0.5, wy, ww, wh, [ww * 0.48, ww * 0.48, 4, 4]);
+        ctx.fillStyle = hc ? '#5c6474' : '#fdf9f0';
+        ctx.fill();
+        ctx.clip();
+
+        // Distant vector mountain silhouettes inside window
+        ctx.fillStyle = hc ? '#3c424d' : '#dce6e2';
+        ctx.beginPath();
+        ctx.moveTo(wx - ww * 0.55, wy + wh);
+        ctx.lineTo(wx - ww * 0.18, wy + wh * 0.56);
+        ctx.lineTo(wx + ww * 0.16, wy + wh * 0.74);
+        ctx.lineTo(wx + ww * 0.36, wy + wh * 0.48);
+        ctx.lineTo(wx + ww * 0.58, wy + wh);
+        ctx.closePath();
+        ctx.fill();
+
+        // Soft vector sun/moon disc inside window
+        ctx.fillStyle = hc ? '#8892a6' : 'rgba(246, 196, 128, 0.52)';
+        ctx.beginPath();
+        ctx.arc(wx - ww * 0.15, wy + wh * 0.30, ww * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Mullion crossbars
+        ctx.strokeStyle = hc ? '#262a32' : '#cbb89d';
+        ctx.lineWidth = Math.max(2, scale * 0.03);
+        ctx.beginPath();
+        ctx.moveTo(wx, wy); ctx.lineTo(wx, wy + wh);
+        ctx.moveTo(wx - ww * 0.5, wy + wh * 0.48); ctx.lineTo(wx + ww * 0.5, wy + wh * 0.48);
+        ctx.moveTo(wx - ww * 0.5, wy + wh * 0.76); ctx.lineTo(wx + ww * 0.5, wy + wh * 0.76);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.strokeStyle = hc ? '#768094' : '#bfa98c';
+        ctx.lineWidth = Math.max(2.5, scale * 0.035);
+        ctx.beginPath();
+        ctx.roundRect(wx - ww * 0.5, wy, ww, wh, [ww * 0.48, ww * 0.48, 4, 4]);
+        ctx.stroke();
+
+        // Volumetric diagonal sunbeam from window (studio mode)
+        if (!hc) {
+          const beam = ctx.createLinearGradient(wx, wy + wh * 0.2, wx + ww * 1.4, deskY);
+          beam.addColorStop(0, 'rgba(255, 252, 236, 0.36)');
+          beam.addColorStop(1, 'rgba(255, 248, 225, 0.0)');
+          ctx.fillStyle = beam;
+          ctx.beginPath();
+          ctx.moveTo(wx - ww * 0.42, wy + wh * 0.35);
+          ctx.lineTo(wx + ww * 0.42, wy + wh * 0.35);
+          ctx.lineTo(wx + ww * 1.55, deskY);
+          ctx.lineTo(wx + ww * 0.35, deskY);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      // 3. Mid Parallax Extending Vector Wall Decor (0.46x Parallax — Bookshelves, Art, Clocks, Lamps, Plants!)
+      const midCam = camX * 0.46;
+      const propStep = 3.1;
+      const mStart = Math.floor((midCam - farSpanW * 0.7) / propStep) - 1;
+      const mEnd = Math.ceil((midCam + farSpanW * 0.7) / propStep) + 1;
+
+      for (let mi = mStart; mi <= mEnd; mi++) {
+        const h = tileHash(mi + 1024);
+        const sx = W * 0.5 + (mi * propStep - midCam) * scale;
+        if (sx < -180 || sx > W + 180) continue;
+        // Never overlap a panoramic window!
+        if (winScreenXs.some(wx => Math.abs(sx - wx) < 1.72 * scale)) continue;
+        // Coprime stride guarantees adjacent wall props are ALWAYS distinct!
+        const kind = (((mi * 3) % 5) + 5) % 5;
+        const baseY = dadoY - (0.35 + ((h >>> 4) % 4) * 0.11) * scale;
+
+        if (kind === 0) {
+          // Bauhaus Minimalist Framed Vector Print
+          const fw = 1.02 * scale, fh = 1.28 * scale;
+          ctx.fillStyle = hc ? '#3a3f49' : 'rgba(255, 252, 246, 0.78)';
+          ctx.strokeStyle = hc ? '#636b7a' : 'rgba(142, 116, 88, 0.45)';
+          ctx.lineWidth = Math.max(2, scale * 0.028);
+          ctx.beginPath(); ctx.roundRect(sx - fw * 0.5, baseY - fh, fw, fh, 4); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = hc ? '#565e6c' : 'rgba(218, 148, 102, 0.42)';
+          ctx.beginPath(); ctx.arc(sx, baseY - fh * 0.56, fw * 0.24, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = hc ? '#272a31' : 'rgba(116, 142, 126, 0.38)';
+          ctx.beginPath();
+          ctx.moveTo(sx - fw * 0.36, baseY - fh * 0.14);
+          ctx.lineTo(sx - fw * 0.06, baseY - fh * 0.46);
+          ctx.lineTo(sx + fw * 0.36, baseY - fh * 0.14);
+          ctx.closePath(); ctx.fill();
+        } else if (kind === 1) {
+          // Floating Wooden Bookshelf + Leaning Vector Books + Potted Ivy
+          const sw2 = 1.55 * scale, sh2 = 0.08 * scale;
+          ctx.fillStyle = hc ? '#505764' : '#b88c62';
+          ctx.beginPath(); ctx.roundRect(sx - sw2 * 0.5, baseY, sw2, sh2, 3); ctx.fill();
+          const bookCols = hc
+            ? ['#3a3f48', '#626a78', '#464c57', '#717a8a', '#343942']
+            : ['#d97757', '#5b8a72', '#4a6fa5', '#d4a359', '#8c5e58'];
+          let bx = sx - sw2 * 0.42;
+          for (let b = 0; b < 6; b++) {
+            const bw = (0.11 + ((h >>> (b * 2)) & 3) * 0.025) * scale;
+            const bh = (0.42 + ((h >>> (b * 3)) & 3) * 0.09) * scale;
+            ctx.fillStyle = bookCols[b % bookCols.length];
+            ctx.fillRect(bx, baseY - bh, bw, bh);
+            bx += bw + 2;
+          }
+          // Small ceramic pot + trailing vector leaves on right end of shelf
+          const px = sx + sw2 * 0.32;
+          ctx.fillStyle = hc ? '#687080' : '#e0cbb5';
+          ctx.beginPath();
+          ctx.moveTo(px - 0.11 * scale, baseY - 0.24 * scale);
+          ctx.lineTo(px + 0.11 * scale, baseY - 0.24 * scale);
+          ctx.lineTo(px + 0.08 * scale, baseY);
+          ctx.lineTo(px - 0.08 * scale, baseY);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = hc ? '#484f5c' : '#659477';
+          for (let lf = -2; lf <= 2; lf++) {
+            ctx.beginPath();
+            ctx.ellipse(px + lf * 0.055 * scale, baseY - (0.30 + Math.abs(lf) * 0.03) * scale, 0.06 * scale, 0.035 * scale, lf * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (kind === 2) {
+          // Live Analog Studio Wall Clock
+          const cr = 0.44 * scale, cy2 = baseY - cr * 1.1;
+          ctx.fillStyle = hc ? '#3e444f' : '#fcf9f2';
+          ctx.strokeStyle = hc ? '#6c7485' : '#9c7c5b';
+          ctx.lineWidth = Math.max(2.2, scale * 0.032);
+          ctx.beginPath(); ctx.arc(sx, cy2, cr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = hc ? '#858e9e' : '#7a634b';
+          ctx.lineWidth = 1.4;
+          for (let tk = 0; tk < 12; tk++) {
+            const a = (tk * Math.PI) / 6;
+            ctx.beginPath();
+            ctx.moveTo(sx + Math.cos(a) * cr * 0.76, cy2 + Math.sin(a) * cr * 0.76);
+            ctx.lineTo(sx + Math.cos(a) * cr * 0.90, cy2 + Math.sin(a) * cr * 0.90);
+            ctx.stroke();
+          }
+          const minA = (nowSec / 60) * Math.PI * 2 - Math.PI * 0.5;
+          const secA = (nowSec % 60) * (Math.PI / 30) - Math.PI * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(sx, cy2); ctx.lineTo(sx + Math.cos(minA) * cr * 0.62, cy2 + Math.sin(minA) * cr * 0.62);
+          ctx.stroke();
+          ctx.strokeStyle = hc ? '#b0b8c8' : '#d96b43';
+          ctx.beginPath();
+          ctx.moveTo(sx, cy2); ctx.lineTo(sx + Math.cos(secA) * cr * 0.72, cy2 + Math.sin(secA) * cr * 0.72);
+          ctx.stroke();
+        } else if (kind === 3) {
+          // Nordic Pendant Studio Cone Lamp
+          const lampY = Math.max(55, dadoY - 1.85 * scale);
+          ctx.strokeStyle = hc ? '#5c6473' : 'rgba(110, 92, 74, 0.5)';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, lampY); ctx.stroke();
+          if (!hc) {
+            const cone = ctx.createLinearGradient(sx, lampY, sx, deskY);
+            cone.addColorStop(0, 'rgba(255, 244, 210, 0.34)');
+            cone.addColorStop(1, 'rgba(255, 244, 210, 0)');
+            ctx.fillStyle = cone;
+            ctx.beginPath();
+            ctx.moveTo(sx - 0.34 * scale, lampY + 0.22 * scale);
+            ctx.lineTo(sx + 0.34 * scale, lampY + 0.22 * scale);
+            ctx.lineTo(sx + 1.25 * scale, deskY);
+            ctx.lineTo(sx - 1.25 * scale, deskY);
+            ctx.closePath(); ctx.fill();
+          }
+          ctx.fillStyle = hc ? '#5e6675' : '#52606d';
+          ctx.beginPath();
+          ctx.moveTo(sx - 0.08 * scale, lampY);
+          ctx.lineTo(sx + 0.08 * scale, lampY);
+          ctx.lineTo(sx + 0.36 * scale, lampY + 0.24 * scale);
+          ctx.lineTo(sx - 0.36 * scale, lampY + 0.24 * scale);
+          ctx.closePath(); ctx.fill();
+        } else {
+          // Botanical Triptych / Studio Pinboard
+          for (let k = -1; k <= 1; k += 2) {
+            const px = sx + k * 0.36 * scale, py = baseY - 0.92 * scale;
+            const pw2 = 0.58 * scale, ph2 = 0.76 * scale;
+            ctx.fillStyle = hc ? '#3c414b' : 'rgba(255, 251, 244, 0.74)';
+            ctx.strokeStyle = hc ? '#626a78' : 'rgba(145, 120, 94, 0.42)';
+            ctx.lineWidth = 1.8;
+            ctx.beginPath(); ctx.roundRect(px - pw2 * 0.5, py, pw2, ph2, 3); ctx.fill(); ctx.stroke();
+            ctx.strokeStyle = hc ? '#7c8596' : 'rgba(92, 132, 102, 0.58)';
+            ctx.beginPath();
+            ctx.moveTo(px, py + ph2 * 0.82);
+            ctx.quadraticCurveTo(px + k * pw2 * 0.18, py + ph2 * 0.48, px, py + ph2 * 0.20);
+            ctx.stroke();
+          }
+        }
+      }
+
+      if (!hc) {
+        ctx.fillStyle = 'rgba(255, 250, 230, 0.55)';
+        for (const m of dustMotes) {
+          const mx = ((m.x + nowSec * m.sp * 0.25) % 1) * W * 0.85 + W * 0.06;
+          const my = ((m.y - nowSec * m.sp * 0.5 + 10) % 1) * (H * 0.65);
+          ctx.beginPath(); ctx.arc(mx, my, m.r, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   function drawDeskAndCoaster() {
     const scale = ppm * camZoom;
-    const tl = w2s(-(deskHalfW + 0.6), 0);
-    const pw = (deskHalfW + 0.6) * 2 * scale;
-    const ph = 1.15 * scale;
+    const hc = skinMode !== 'studio' && !xrayMode;
+    const topY = w2s(0, 0).y;
+    const ph = Math.max(H - topY + 20, 1.3 * scale);
+    const backDepth = Math.max(14, scale * 0.24);
 
-    // 2.5D perspective rear tabletop depth strip (behind y=0 contact line!)
-    const backDepth = Math.max(14, scale * 0.22);
-    const surfaceGrad = ctx.createLinearGradient(0, tl.y - backDepth, 0, tl.y + 8);
-    surfaceGrad.addColorStop(0, xrayMode ? '#1e293b' : '#c48b5a');
-    surfaceGrad.addColorStop(1, xrayMode ? '#334155' : '#dfa878');
+    // 1. Endless Tabletop Rear Perspective Plane (spans full viewport width seamlessly!)
+    const surfaceGrad = ctx.createLinearGradient(0, topY - backDepth, 0, topY + 8);
+    if (xrayMode) {
+      surfaceGrad.addColorStop(0, '#1e293b');
+      surfaceGrad.addColorStop(1, '#334155');
+    } else if (hc) {
+      surfaceGrad.addColorStop(0, '#cfd5df');
+      surfaceGrad.addColorStop(1, '#eef1f6');
+    } else {
+      surfaceGrad.addColorStop(0, '#c48b5a');
+      surfaceGrad.addColorStop(1, '#dfa878');
+    }
     ctx.fillStyle = surfaceGrad;
-    ctx.beginPath();
-    ctx.roundRect(tl.x, tl.y - backDepth * 0.65, pw, backDepth + 8, [8, 8, 0, 0]);
-    ctx.fill();
+    ctx.fillRect(0, topY - backDepth * 0.68, W, backDepth + 8);
 
-    // Front oak desk apron fascia
-    const bodyGrad = ctx.createLinearGradient(0, tl.y, 0, tl.y + ph);
-    bodyGrad.addColorStop(0, xrayMode ? '#1e293b' : '#8c5630');
-    bodyGrad.addColorStop(0.22, xrayMode ? '#0f172a' : '#734424');
-    bodyGrad.addColorStop(1, xrayMode ? '#090d16' : '#4e2d16');
+    // 2. Front Apron Fascia
+    const bodyGrad = ctx.createLinearGradient(0, topY, 0, topY + Math.min(ph, 180));
+    if (xrayMode) {
+      bodyGrad.addColorStop(0, '#1e293b');
+      bodyGrad.addColorStop(1, '#090d16');
+    } else if (hc) {
+      bodyGrad.addColorStop(0, '#5a616e');
+      bodyGrad.addColorStop(0.28, '#414752');
+      bodyGrad.addColorStop(1, '#262a31');
+    } else {
+      bodyGrad.addColorStop(0, '#8c5630');
+      bodyGrad.addColorStop(0.24, '#734424');
+      bodyGrad.addColorStop(1, '#4e2d16');
+    }
     ctx.fillStyle = bodyGrad;
-    ctx.fillRect(tl.x, tl.y + 6, pw, ph);
+    ctx.fillRect(0, topY + 6, W, ph);
 
-    // Chamfered sunlit oak front lip + subtle wood grain lines
-    ctx.fillStyle = xrayMode ? '#475569' : '#eab688';
-    ctx.fillRect(tl.x, tl.y, pw, 7);
+    // 3. Sunlit Bevel Front Lip + Infinite Scrolling Wood Plank Seams & Distance Ticks
+    ctx.fillStyle = xrayMode ? '#475569' : (hc ? '#ffffff' : '#eab688');
+    ctx.fillRect(0, topY, W, 7);
+
+    const worldLeft = camX - (W * 0.55) / scale;
+    const worldRight = camX + (W * 0.55) / scale;
+
     if (!xrayMode) {
-      ctx.strokeStyle = 'rgba(92, 50, 22, 0.16)';
+      ctx.strokeStyle = hc ? 'rgba(20, 22, 28, 0.36)' : 'rgba(92, 50, 22, 0.18)';
       ctx.lineWidth = 1.2;
       for (let g = 1; g <= 3; g++) {
-        const gy = tl.y + 12 + g * 16;
-        ctx.beginPath(); ctx.moveTo(tl.x, gy); ctx.lineTo(tl.x + pw, gy); ctx.stroke();
+        const gy = topY + 12 + g * 18;
+        ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+      }
+      // Scrolling oak plank vertical joints every 1.5m
+      const plankW = 1.5;
+      for (let pk = Math.floor(worldLeft / plankW); pk <= Math.ceil(worldRight / plankW); pk++) {
+        const jx = w2s(pk * plankW, 0).x;
+        ctx.beginPath();
+        ctx.moveTo(jx - backDepth * 0.35, topY - backDepth * 0.68);
+        ctx.lineTo(jx, topY);
+        ctx.lineTo(jx, topY + 72);
+        ctx.stroke();
       }
     }
 
-    // Center Target Cork Coaster ("🎯 靶心杯垫 ×1.4") right at x = 0!
-    const cPos = w2s(0, 0);
-    const cRx = COASTER_HALF_W * scale;
+    // Subtle distance ruler ticks every 2m along the infinite counter
+    ctx.fillStyle = xrayMode ? 'rgba(148, 163, 184, 0.55)' : (hc ? 'rgba(235, 240, 248, 0.72)' : 'rgba(255, 236, 210, 0.45)');
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    for (let m = Math.floor(worldLeft / 2) * 2; m <= Math.ceil(worldRight / 2) * 2; m += 2) {
+      if (m % COASTER_SPACING === 0) continue;
+      const mx = w2s(m, 0).x;
+      ctx.fillRect(mx - 0.5, topY + 7, 1, 5);
+      if (!widgetMode && !hc) ctx.fillText(`${m > 0 ? '+' : ''}${m}m`, mx, topY + 21);
+    }
+
+    // 4. Repeating Stitched Cork Bullseye Coasters Every 6.0m!
     const cRy = Math.max(5.5, scale * 0.085);
-    ctx.save();
-    ctx.fillStyle = xrayMode ? 'rgba(56, 189, 248, 0.22)' : '#b57445';
-    ctx.beginPath();
-    ctx.ellipse(cPos.x, cPos.y + 1, cRx, cRy + 2.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const cRx = COASTER_HALF_W * scale;
+    const firstC = Math.floor(worldLeft / COASTER_SPACING) * COASTER_SPACING;
+    const lastC = Math.ceil(worldRight / COASTER_SPACING) * COASTER_SPACING;
 
-    ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.28)' : '#e6be94';
-    ctx.strokeStyle = xrayMode ? '#5eead4' : '#8c522b';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.96, cRy, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    for (let cxWorld = firstC; cxWorld <= lastC; cxWorld += COASTER_SPACING) {
+      const cPos = w2s(cxWorld, 0);
+      ctx.save();
+      ctx.fillStyle = xrayMode ? 'rgba(56, 189, 248, 0.22)' : (hc ? '#1e2128' : '#b57445');
+      ctx.beginPath();
+      ctx.ellipse(cPos.x, cPos.y + 1.5, cRx, cRy + 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-    // Inner stitched bullseye ring on coaster
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = xrayMode ? 'rgba(255, 209, 102, 0.8)' : 'rgba(138, 75, 34, 0.55)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.62, cRy * 0.62, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+      ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.28)' : (hc ? '#f4f6fa' : '#e6be94');
+      ctx.strokeStyle = xrayMode ? '#5eead4' : (hc ? '#181a20' : '#8c522b');
+      ctx.lineWidth = hc ? 2.0 : 1.5;
+      ctx.beginPath();
+      ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.96, cRy, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
-    if (!widgetMode) {
-      ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.75)' : 'rgba(255, 240, 220, 0.62)';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🎯 靶心软木垫 (立中 ×1.4)', cPos.x, tl.y + 26);
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = xrayMode ? 'rgba(255, 209, 102, 0.8)' : (hc ? '#181a20' : 'rgba(138, 75, 34, 0.58)');
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.60, cRy * 0.60, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      if (!widgetMode && !hc) {
+        ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.8)' : 'rgba(255, 240, 220, 0.72)';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        const label = cxWorld === 0
+          ? '🎯 0m 起点靶垫 (×1.4)'
+          : `🎯 ${cxWorld > 0 ? '+' : ''}${cxWorld}m 远征靶垫`;
+        ctx.fillText(label, cPos.x, topY + 26);
+      }
     }
   }
 
@@ -2815,6 +3184,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     const cfg = BOTTLES[bottleKey];
     const spr = spriteCache[bottleKey];
     const scale = ppm * camZoom;
+    const hc = skinMode !== 'studio' && !xrayMode;
     const rx = prevRenderX + (currRenderX - prevRenderX) * renderAlpha;
     const ry = prevRenderY + (currRenderY - prevRenderY) * renderAlpha;
     const ang = prevRenderAng + (currRenderAng - prevRenderAng) * renderAlpha;
@@ -2825,7 +3195,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     const drawW = hwPx * 2.035;
     const drawH = hhPx * 2.018;
 
-    // 1. Dynamic contact shadow on oak desk
+    // 1. Dynamic contact shadow on tabletop
     const absA = Math.abs(normalizeAngle(ang));
     const restDist = Math.abs(Math.cos(absA)) * cfg.halfH + Math.abs(Math.sin(absA)) * cfg.halfW;
     const hAbove = Math.max(0, ry - restDist);
@@ -2833,18 +3203,26 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     const shadowSpan = Math.abs(Math.cos(absA)) * hwPx + Math.abs(Math.sin(absA)) * hhPx * 0.85;
     const rad = shadowSpan * Math.max(0.35, 1.06 - hAbove * 0.12);
     const shGrad = ctx.createRadialGradient(shPos.x, shPos.y + 2, rad * 0.1, shPos.x, shPos.y + 2, rad * 1.15);
-    const peakAlpha = Math.max(0.06, 0.40 - hAbove * 0.06);
-    shGrad.addColorStop(0, `rgba(32, 18, 8, ${peakAlpha})`);
-    shGrad.addColorStop(1, 'rgba(32, 18, 8, 0)');
+    const peakAlpha = Math.max(0.08, (hc ? 0.68 : 0.40) - hAbove * 0.06);
+    shGrad.addColorStop(0, `rgba(18, 12, 8, ${peakAlpha})`);
+    shGrad.addColorStop(1, 'rgba(18, 12, 8, 0)');
     ctx.fillStyle = shGrad;
     ctx.beginPath();
     ctx.ellipse(shPos.x, shPos.y + 2, rad * 1.15, Math.max(4.5, rad * 0.22), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Back PET/Glass Layer
+    // 2. Back PET/Glass Layer (+ Studio Sculptural Rim-Light in Dither/ASCII skins so translucent bottles pop!)
     ctx.save();
     ctx.translate(scr.x, scr.y);
     ctx.rotate(-ang);
+    if (hc) {
+      traceInnerClip(ctx, spr, hwPx * 1.02, hhPx * 1.01);
+      ctx.fillStyle = 'rgba(215, 224, 236, 0.24)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.90)';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+    }
     if (spr && spr.backImg) ctx.drawImage(spr.backImg, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
     ctx.restore();
 
@@ -2878,6 +3256,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
       const padM = 1.12;
       const lw = 80;
       const lh = Math.max(136, Math.round(lw * (cfg.halfH / cfg.halfW)));
+      const curLutId = `${bottleKey}_${hc ? 1 : 0}`;
       if (liqCanvas.width !== lw || liqCanvas.height !== lh) { liqCanvas.width = lw; liqCanvas.height = lh; lutKey = ''; }
       liqCtx.clearRect(0, 0, lw, lh);
 
@@ -2887,18 +3266,19 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
       const blobR = Math.max(7.0, 0.116 * mScale);
       const blobD = blobR * 2;
 
-      if (lutKey !== bottleKey) {
-        lutKey = bottleKey;
+      if (lutKey !== curLutId) {
+        lutKey = curLutId;
         const halfLw = lw * 0.5;
         const invSpan = 1.0 / (cfg.halfW * 0.95 * mScale);
         for (let px = 0; px < lw; px++) {
           const radNorm = Math.min(1.0, Math.abs(px - halfLw) * invSpan);
           const cyl = Math.pow(radNorm, 1.55);
-          const caustic = Math.max(0, 1.0 - Math.abs(radNorm - 0.28) * 4.0) * 0.16;
-          colR[px] = Math.min(255, Math.round(cr * (1 - cyl) + er * cyl + caustic * 60));
-          colG[px] = Math.min(255, Math.round(cg * (1 - cyl) + eg * cyl + caustic * 65));
-          colB[px] = Math.min(255, Math.round(cb * (1 - cyl) + eb * cyl + caustic * 70));
-          colA[px] = Math.round(cfg.centerAlpha * (1 - cyl) + cfg.edgeAlpha * cyl);
+          const caustic = Math.max(0, 1.0 - Math.abs(radNorm - 0.28) * 4.0) * 0.18;
+          colR[px] = Math.min(255, Math.round(cr * (1 - cyl) + er * cyl + caustic * 65));
+          colG[px] = Math.min(255, Math.round(cg * (1 - cyl) + eg * cyl + caustic * 70));
+          colB[px] = Math.min(255, Math.round(cb * (1 - cyl) + eb * cyl + caustic * 75));
+          const rawA = Math.round(cfg.centerAlpha * (1 - cyl) + cfg.edgeAlpha * cyl);
+          colA[px] = hc ? Math.min(248, rawA + 75) : rawA;
         }
       }
 
@@ -2930,9 +3310,9 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
           const a = d[k + 3];
           if (a < 68) { d[k + 3] = 0; continue; }
           const dxAbs = px > halfLw ? px - halfLw : halfLw - px;
-          if (a < 112 && dxAbs < wallPxX && !nearCapOrBase) {
-            d[k] = rr; d[k + 1] = rg; d[k + 2] = rb;
-            d[k + 3] = (rimA * (140 + ((a - 68) * 115 >> 6))) >> 8;
+          if (a < (hc ? 124 : 112) && dxAbs < wallPxX && !nearCapOrBase) {
+            d[k] = hc ? 255 : rr; d[k + 1] = hc ? 255 : rg; d[k + 2] = hc ? 255 : rb;
+            d[k + 3] = hc ? 255 : ((rimA * (140 + ((a - 68) * 115 >> 6))) >> 8);
           } else {
             d[k] = colR[px]; d[k + 1] = colG[px]; d[k + 2] = colB[px];
             d[k + 3] = a < 94 ? (colA[px] * (195 + ((a - 68) << 1))) >> 8 : colA[px];
@@ -2992,185 +3372,297 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
   }
 
   // ============================================================================
-  // 7. Live Retro Shader Skins (Macintosh 1984 1-Bit / ASCII Art / GameBoy / CRT)
+  // 7. Genuine Saganaki22/Dither Skin Pipeline (Atkinson / Halftone / Sobel ASCII / Floyd-Steinberg)
   // ============================================================================
-  const BAYER4 = [
-     0, 128,  32, 160,
-   192,  64, 224,  96,
-    48, 176,  16, 144,
-   240, 112, 208,  80
-  ];
-  const ASCII_RAMP = ' .:-=+*#%@';
+  let ditherBuf = new Float32Array(0);
+  let asciiSampleCanvas = null, asciiSampleCtx = null;
+
+  // Pre-bake crisp 6x10 pixel-exact monospace glyph masks for zero-drift per-cell RGB ASCII + Sobel edges!
+  const ASCII_GLYPHS = ' .·:;+*xX$#@|-/\\';
+  const GLYPH_W = 6, GLYPH_H = 10;
+  const glyphMasks = new Uint8Array(ASCII_GLYPHS.length * GLYPH_W * GLYPH_H);
+  (() => {
+    const gc = document.createElement('canvas');
+    gc.width = ASCII_GLYPHS.length * GLYPH_W;
+    gc.height = GLYPH_H;
+    const gctx = gc.getContext('2d');
+    gctx.fillStyle = '#000';
+    gctx.fillRect(0, 0, gc.width, gc.height);
+    gctx.fillStyle = '#fff';
+    gctx.font = 'bold 9.5px Consolas, "Courier New", monospace';
+    gctx.textAlign = 'center';
+    gctx.textBaseline = 'middle';
+    for (let i = 0; i < ASCII_GLYPHS.length; i++) {
+      gctx.fillText(ASCII_GLYPHS[i], i * GLYPH_W + GLYPH_W * 0.5, GLYPH_H * 0.52);
+    }
+    const gd = gctx.getImageData(0, 0, gc.width, gc.height).data;
+    for (let i = 0; i < ASCII_GLYPHS.length; i++) {
+      const base = i * GLYPH_W * GLYPH_H;
+      for (let py = 0; py < GLYPH_H; py++) {
+        for (let px = 0; px < GLYPH_W; px++) {
+          glyphMasks[base + py * GLYPH_W + px] = gd[(py * gc.width + i * GLYPH_W + px) * 4] > 92 ? 1 : 0;
+        }
+      }
+    }
+  })();
+
+  function ensureDitherBuf(len) {
+    if (ditherBuf.length < len) ditherBuf = new Float32Array(len);
+    return ditherBuf;
+  }
 
   function applySkinPostProcess() {
     if (skinMode === 'studio' || xrayMode) return;
 
     if (skinMode === 'mac') {
-      // 1984 Apple Macintosh 1-Bit Ordered Bayer Dithering + Classic System 1 Window Chrome!
-      const pxSize = 2;
-      const sw = Math.max(64, Math.floor(W / pxSize));
-      const sh = Math.max(64, Math.floor(H / pxSize));
+      // Saganaki22/Dither — Genuine 1:1 Pixel Serpentine Bill Atkinson 1/8 Error-Diffusion!
+      // Full CSS resolution (pxSize = 1) reproduces the exact fine stipple weave of dithered-atkinson.png!
+      const sw = Math.max(120, Math.floor(W));
+      const sh = Math.max(120, Math.floor(H));
       if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
       fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
       const img = fxCtx.getImageData(0, 0, sw, sh);
       const d = img.data;
+      const buf = ensureDitherBuf(sw * (sh + 2));
+      buf.fill(0, sw * sh, sw * (sh + 2));
+
+      for (let i = 0, p = 0, n = sw * sh; p < n; p++, i += 4) {
+        buf[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      }
+
       for (let y = 0; y < sh; y++) {
-        const by = (y & 3) << 2;
-        const row = y * sw * 4;
-        for (let x = 0; x < sw; x++) {
-          const i = row + (x << 2);
-          // Contrast-boosted luminance so bottle labels, edges & water ripples pop in crisp 1-bit!
-          const lum = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
-          const boosted = Math.max(0, Math.min(255, ((lum - 148) * 1.55 + 142) | 0));
-          const white = boosted > BAYER4[by + (x & 3)];
-          d[i]     = white ? 245 : 22;
-          d[i + 1] = white ? 244 : 22;
-          d[i + 2] = white ? 238 : 25;
-          d[i + 3] = 255;
+        const rev = (y & 1) === 1;
+        const xStart = rev ? sw - 1 : 0;
+        const xEnd = rev ? -1 : sw;
+        const dir = rev ? -1 : 1;
+        const row = y * sw;
+
+        for (let x = xStart; x !== xEnd; x += dir) {
+          const idx = row + x;
+          const oldVal = buf[idx];
+          const isWhite = oldVal >= 128;
+          const newVal = isWhite ? 255 : 0;
+          const err = (oldVal - newVal) * 0.11875; // strength 0.95 / 8 (Atkinson 6/8 retention!)
+
+          const x1 = x + dir, x2 = x + dir * 2, xm1 = x - dir;
+          if (x1 >= 0 && x1 < sw) buf[idx + dir] += err;
+          if (x2 >= 0 && x2 < sw) buf[idx + dir * 2] += err;
+          if (xm1 >= 0 && xm1 < sw) buf[idx + sw - dir] += err;
+          buf[idx + sw] += err;
+          if (x1 >= 0 && x1 < sw) buf[idx + sw + dir] += err;
+          buf[idx + sw * 2] += err;
+
+          const di = idx << 2;
+          d[di]     = isWhite ? 246 : 22;
+          d[di + 1] = isWhite ? 244 : 23;
+          d[di + 2] = isWhite ? 238 : 27;
+          d[di + 3] = 255;
         }
       }
       fxCtx.putImageData(img, 0, 0);
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(fxCanvas, 0, 0, W, H);
-
-      // Authentic 1984 Mac System 1 Pinstripe Window Frame
-      if (!widgetMode) {
-        ctx.strokeStyle = '#161619';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(4, 4, W - 8, H - 8);
-        ctx.fillStyle = '#f5f4ee';
-        ctx.fillRect(5, 5, W - 10, 22);
-        ctx.strokeRect(4, 4, W - 8, 23);
-        for (let py = 8; py <= 22; py += 3) {
-          ctx.beginPath(); ctx.moveTo(10, py); ctx.lineTo(W - 10, py); ctx.stroke();
-        }
-        const titleW = 220;
-        ctx.fillStyle = '#f5f4ee';
-        ctx.fillRect((W - titleW) * 0.5, 6, titleW, 19);
-        ctx.fillStyle = '#161619';
-        ctx.font = 'bold 12px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('Macintosh BottleFlip 1984', W * 0.5, 20);
-      }
       ctx.restore();
-    } else if (skinMode === 'gb') {
-      // 1989 Nintendo Game Boy DMG-01 4-Shade Olive Pixel Matrix!
-      const pxSize = 3;
-      const sw = Math.max(64, Math.floor(W / pxSize));
-      const sh = Math.max(64, Math.floor(H / pxSize));
+
+    } else if (skinMode === 'halftone') {
+      // Saganaki22/Dither — Genuine 1:1 45° Rotated Circular Halftone Screen (matches dithered-halftone.png!)
+      const sw = Math.max(120, Math.floor(W));
+      const sh = Math.max(120, Math.floor(H));
       if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
       fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
       const img = fxCtx.getImageData(0, 0, sw, sh);
       const d = img.data;
+      const nPix = sw * sh;
+      const lumBuf = ensureDitherBuf(nPix);
+
+      for (let i = 0, p = 0; p < nPix; p++, i += 4) {
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        lumBuf[p] = Math.max(0, Math.min(255, (lum - 115) * 1.28 + 112));
+      }
+
+      const cell = 4.2;
+      const cos45 = 0.70710678;
+      const invC = cos45 / cell;
+      const backScale = cell * cos45;
+
+      for (let y = 0; y < sh; y++) {
+        const row = y * sw;
+        for (let x = 0; x < sw; x++) {
+          const u = (x + y) * invC;
+          const v = (y - x) * invC;
+          const cu = Math.round(u);
+          const cv = Math.round(v);
+          const du = u - cu, dv = v - cv;
+          const dist = Math.sqrt(du * du + dv * dv);
+
+          const cx = Math.max(0, Math.min(sw - 1, Math.round((cu - cv) * backScale)));
+          const cy = Math.max(0, Math.min(sh - 1, Math.round((cu + cv) * backScale)));
+          const normL = lumBuf[cy * sw + cx] * (1 / 255);
+          const dotR = 0.70 * Math.pow(normL, 0.78);
+          const cov = Math.max(0, Math.min(1, (dotR - dist) * 6.8 + 0.5));
+
+          const di = (row + x) << 2;
+          d[di]     = (15 + cov * 232) | 0;
+          d[di + 1] = (17 + cov * 228) | 0;
+          d[di + 2] = (22 + cov * 218) | 0;
+          d[di + 3] = 255;
+        }
+      }
+      fxCtx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(fxCanvas, 0, 0, W, H);
+      ctx.restore();
+
+    } else if (skinMode === 'ascii') {
+      // High-Density 6x10 Pixel-Exact Bitmap-Atlas ASCII + 3x3 Sobel Contour Rasterizer!
+      const cols = Math.max(40, Math.floor(W / GLYPH_W));
+      const rows = Math.max(24, Math.floor(H / GLYPH_H));
+      const outW = cols * GLYPH_W, outH = rows * GLYPH_H;
+
+      if (!asciiSampleCanvas) {
+        asciiSampleCanvas = document.createElement('canvas');
+        asciiSampleCtx = asciiSampleCanvas.getContext('2d', { willReadFrequently: true });
+      }
+      if (asciiSampleCanvas.width !== cols || asciiSampleCanvas.height !== rows) {
+        asciiSampleCanvas.width = cols; asciiSampleCanvas.height = rows;
+      }
+      if (fxCanvas.width !== outW || fxCanvas.height !== outH) {
+        fxCanvas.width = outW; fxCanvas.height = outH;
+      }
+
+      asciiSampleCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cols, rows);
+      const sd = asciiSampleCtx.getImageData(0, 0, cols, rows).data;
+      const lum = ensureDitherBuf(cols * rows);
+      for (let p = 0, i = 0; p < cols * rows; p++, i += 4) {
+        lum[p] = 0.299 * sd[i] + 0.587 * sd[i + 1] + 0.114 * sd[i + 2];
+      }
+
+      const outImg = fxCtx.createImageData(outW, outH);
+      const od = outImg.data;
+      // Fill deep CRT phosphor background (#080c12)
+      for (let i = 0; i < od.length; i += 4) {
+        od[i] = 8; od[i + 1] = 12; od[i + 2] = 18; od[i + 3] = 255;
+      }
+
+      for (let r = 0; r < rows; r++) {
+        const rOff = r * cols;
+        for (let c = 0; c < cols; c++) {
+          const idx = rOff + c;
+          const si = idx << 2;
+          const R = sd[si], G = sd[si + 1], B = sd[si + 2];
+          const L = lum[idx];
+
+          // 3x3 Sobel directional edge detector for razor-sharp bottle & water contours!
+          let gIdx = 0;
+          let isEdge = false;
+          if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) {
+            const tl = lum[idx - cols - 1], tc = lum[idx - cols], tr = lum[idx - cols + 1];
+            const ml = lum[idx - 1],                              mr = lum[idx + 1];
+            const bl = lum[idx + cols - 1], bc = lum[idx + cols], br = lum[idx + cols + 1];
+            const gx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
+            const gy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
+            const mag = Math.abs(gx) + Math.abs(gy);
+            if (mag > 135) {
+              isEdge = true;
+              const ax = Math.abs(gx), ay = Math.abs(gy);
+              if (ax > ay * 2.1) gIdx = 12;      // '|' vertical bottle wall
+              else if (ay > ax * 2.1) gIdx = 13; // '-' horizontal meniscus / desk lip
+              else gIdx = (gx * gy > 0) ? 15 : 14; // '\' or '/' tapered shoulder
+            }
+          }
+
+          if (!isEdge) {
+            if (L < 72) continue; // Clean deep CRT negative space on bare wall
+            gIdx = Math.min(11, Math.max(1, ((L - 58) / 17.0) | 0));
+          }
+
+          // Semantic terminal phosphor RGB tint
+          let cr = 64, cg = 226, cb = 148; // Matrix emerald default
+          if (L > 236) { cr = 240; cg = 253; cb = 250; }
+          else if (B > R + 24 && B > 110) { cr = 56; cg = 198; cb = 252; }      // Cyan sloshing water
+          else if (R > G + 36 && R > 105) { cr = 251; cg = 113; cb = 133; }     // Coral red cap/label
+          else if (R > B + 35 && G > 110) { cr = 251; cg = 191; cb = 36; }      // Amber wood/coaster
+          else if (L < 96 && !isEdge) { cr = 34; cg = 92; cb = 68; }            // Subtle dim background props
+
+          const maskBase = gIdx * GLYPH_W * GLYPH_H;
+          const outY0 = r * GLYPH_H;
+          const outX0 = c * GLYPH_W;
+          for (let py = 0; py < GLYPH_H; py++) {
+            const mRow = maskBase + py * GLYPH_W;
+            const oRow = ((outY0 + py) * outW + outX0) << 2;
+            for (let px = 0; px < GLYPH_W; px++) {
+              if (glyphMasks[mRow + px]) {
+                const oi = oRow + (px << 2);
+                od[oi] = cr; od[oi + 1] = cg; od[oi + 2] = cb;
+              }
+            }
+          }
+        }
+      }
+      fxCtx.putImageData(outImg, 0, 0);
+      ctx.save();
+      ctx.fillStyle = '#080c12';
+      ctx.fillRect(0, 0, W, H);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(fxCanvas, 0, 0, outW, outH);
+      ctx.restore();
+
+    } else if (skinMode === 'gb') {
+      // Saganaki22/Dither — Genuine Serpentine Floyd-Steinberg [7,3,5,1]/16 Error-Diffusion
+      // Quantized to Authentic 1989 Nintendo Game Boy DMG-01 4-Color Olive LCD Palette!
+      const pxSize = 2;
+      const sw = Math.max(80, Math.floor(W / pxSize));
+      const sh = Math.max(80, Math.floor(H / pxSize));
+      if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
+      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
+      const img = fxCtx.getImageData(0, 0, sw, sh);
+      const d = img.data;
+      const buf = ensureDitherBuf(sw * (sh + 2));
+      buf.fill(0, sw * sh, sw * (sh + 2));
+
       const pal = [
         [15, 56, 15],
         [48, 98, 48],
         [139, 172, 15],
         [155, 188, 15]
       ];
+      const qLevels = [24, 92, 168, 236];
+
+      for (let i = 0, p = 0, n = sw * sh; p < n; p++, i += 4) {
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        buf[p] = Math.max(0, Math.min(255, (lum - 112) * 1.24 + 122));
+      }
+
       for (let y = 0; y < sh; y++) {
-        const by = (y & 3) << 2;
-        const row = y * sw * 4;
-        for (let x = 0; x < sw; x++) {
-          const i = row + (x << 2);
-          const lum = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
-          const dither = (BAYER4[by + (x & 3)] - 128) >> 3;
-          const idx = Math.max(0, Math.min(3, ((lum + dither) * 4) >> 8));
-          const c = pal[idx];
-          d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+        const rev = (y & 1) === 1;
+        const xStart = rev ? sw - 1 : 0;
+        const xEnd = rev ? -1 : sw;
+        const dir = rev ? -1 : 1;
+        const row = y * sw;
+
+        for (let x = xStart; x !== xEnd; x += dir) {
+          const idx = row + x;
+          const oldVal = buf[idx];
+          const pIdx = oldVal < 60 ? 0 : (oldVal < 132 ? 1 : (oldVal < 202 ? 2 : 3));
+          const newVal = qLevels[pIdx];
+          const err = (oldVal - newVal) * 0.055; // 0.88 / 16
+
+          const x1 = x + dir, xm1 = x - dir;
+          if (x1 >= 0 && x1 < sw) buf[idx + dir] += err * 7;
+          if (xm1 >= 0 && xm1 < sw) buf[idx + sw - dir] += err * 3;
+          buf[idx + sw] += err * 5;
+          if (x1 >= 0 && x1 < sw) buf[idx + sw + dir] += err;
+
+          const c = pal[pIdx];
+          const di = idx << 2;
+          d[di] = c[0]; d[di + 1] = c[1]; d[di + 2] = c[2]; d[di + 3] = 255;
         }
       }
       fxCtx.putImageData(img, 0, 0);
       ctx.save();
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(fxCanvas, 0, 0, W, H);
-      ctx.restore();
-    } else if (skinMode === 'ascii') {
-      // Real-Time Glowing Phosphor Terminal ASCII Art Rasterizer!
-      const cellW = 7, cellH = 12;
-      const cols = Math.max(32, Math.floor(W / cellW));
-      const rows = Math.max(20, Math.floor(H / cellH));
-      if (fxCanvas.width !== cols || fxCanvas.height !== rows) { fxCanvas.width = cols; fxCanvas.height = rows; }
-      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cols, rows);
-      const d = fxCtx.getImageData(0, 0, cols, rows).data;
-
-      ctx.save();
-      ctx.fillStyle = '#070b10';
-      ctx.fillRect(0, 0, W, H);
-      ctx.font = 'bold 11px Consolas, "Courier New", monospace';
-      ctx.textBaseline = 'top';
-      ctx.textAlign = 'left';
-
-      // Batch green characters vs cyan water/red label accents for fast crisp rendering!
-      let greenLines = new Array(rows).fill('');
-      const accents = [];
-      for (let r = 0; r < rows; r++) {
-        let line = '';
-        const off = r * cols * 4;
-        for (let c = 0; c < cols; c++) {
-          const i = off + (c << 2);
-          const R = d[i], G = d[i + 1], B = d[i + 2];
-          // Measure contrast from bright beige background (~234,224,208) so bottle & desk stand out vividly!
-          const diffBg = Math.abs(R - 234) + Math.abs(G - 224) + Math.abs(B - 208);
-          if (diffBg < 36) {
-            line += (r + c) % 11 === 0 ? '·' : ' ';
-            continue;
-          }
-          const intensity = Math.min(9, Math.max(1, (diffBg / 42) | 0));
-          const ch = ASCII_RAMP[intensity];
-          if (B > R + 28) {
-            line += ' ';
-            accents.push({ x: c * cellW, y: r * cellH, ch, col: '#38bdf8' }); // Blue water
-          } else if (R > G + 45) {
-            line += ' ';
-            accents.push({ x: c * cellW, y: r * cellH, ch, col: '#fb7185' }); // Red cap/label
-          } else {
-            line += ch;
-          }
-        }
-        greenLines[r] = line;
-      }
-      ctx.fillStyle = '#34d399';
-      for (let r = 0; r < rows; r++) {
-        ctx.fillText(greenLines[r], 0, r * cellH);
-      }
-      for (let k = 0; k < accents.length; k++) {
-        const a = accents[k];
-        ctx.fillStyle = a.col;
-        ctx.fillText(a.ch, a.x, a.y);
-      }
-      ctx.restore();
-    } else if (skinMode === 'crt') {
-      // Synthwave Neon Edge-Glow CRT Scanline Mode!
-      const sw = Math.max(80, Math.floor(W / 2));
-      const sh = Math.max(80, Math.floor(H / 2));
-      if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
-      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
-      const img = fxCtx.getImageData(0, 0, sw, sh);
-      const d = img.data;
-      for (let y = 0; y < sh; y++) {
-        const scan = (y & 1) ? 0.76 : 1.0;
-        const row = y * sw * 4;
-        for (let x = 0; x < sw; x++) {
-          const i = row + (x << 2);
-          const R = d[i], G = d[i + 1], B = d[i + 2];
-          const diffBg = Math.abs(R - 234) + Math.abs(G - 224) + Math.abs(B - 208);
-          if (diffBg < 34) {
-            // Deep cyber purple-navy grid background
-            const grid = (x % 24 === 0 || y % 24 === 0) ? 18 : 0;
-            d[i] = (14 + grid) * scan; d[i + 1] = (10 + grid) * scan; d[i + 2] = (34 + grid * 2) * scan;
-          } else {
-            // Boost neon chroma on bottle, label & water!
-            d[i]     = Math.min(255, (R * 1.15 + 18) * scan);
-            d[i + 1] = Math.min(255, (G * 1.08 + 10) * scan);
-            d[i + 2] = Math.min(255, (B * 1.28 + 38) * scan);
-          }
-        }
-      }
-      fxCtx.putImageData(img, 0, 0);
-      ctx.save();
-      ctx.imageSmoothingEnabled = true;
       ctx.drawImage(fxCanvas, 0, 0, W, H);
       ctx.restore();
     }
@@ -3261,7 +3753,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
       e.preventDefault();
       spaceCharging = true; spaceChargeT = 0;
     } else if (e.code === 'KeyR') {
-      rebuildWorld();
+      rebuildWorld(!e.shiftKey);
     }
   });
   window.addEventListener('keyup', (e) => {
@@ -3284,7 +3776,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
   slider.addEventListener('input', () => {
     waterPct = parseInt(slider.value, 10);
     syncWaterBadge();
-    rebuildWorld();
+    rebuildWorld(true);
   });
   syncWaterBadge();
 
@@ -3292,7 +3784,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     const btn = e.target.closest('.b-btn'); if (!btn) return;
     bottleKey = btn.dataset.type;
     document.querySelectorAll('.b-btn').forEach(x => x.classList.toggle('active', x === btn));
-    rebuildWorld();
+    rebuildWorld(true);
   });
 
   function setSkin(sk) {
@@ -3325,7 +3817,7 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     const wbSfx = document.getElementById('wb-sfx');
     if (wbSfx) wbSfx.textContent = sfxEnabled ? '🔊' : '🔇';
   });
-  document.getElementById('btn-reset').addEventListener('click', () => rebuildWorld());
+  document.getElementById('btn-reset').addEventListener('click', (e) => rebuildWorld(!e.shiftKey));
 
   // Native Desktop Widget Bridge
   function postHost(msg) {
@@ -3372,12 +3864,40 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
   // ============================================================================
   // 9. Main Loop
   // ============================================================================
+  function drawPostSkinLabels() {
+    if (widgetMode || xrayMode || skinMode === 'studio') return;
+    const scale = ppm * camZoom;
+    const topY = w2s(0, 0).y;
+    const worldLeft = camX - (W * 0.55) / scale;
+    const worldRight = camX + (W * 0.55) / scale;
+    const firstC = Math.floor(worldLeft / COASTER_SPACING) * COASTER_SPACING;
+    const lastC = Math.ceil(worldRight / COASTER_SPACING) * COASTER_SPACING;
+
+    ctx.save();
+    ctx.font = 'bold 11px Consolas, "Courier New", monospace';
+    ctx.textAlign = 'center';
+    const col = skinMode === 'gb' ? '#9bbc0f' : (skinMode === 'ascii' ? '#34d399' : '#f8fafc');
+    const bg = skinMode === 'gb' ? 'rgba(15, 56, 15, 0.88)' : 'rgba(15, 18, 24, 0.85)';
+
+    for (let cxWorld = firstC; cxWorld <= lastC; cxWorld += COASTER_SPACING) {
+      const cPos = w2s(cxWorld, 0);
+      const label = cxWorld === 0 ? '🎯 0m 起点靶垫 (×1.4)' : `🎯 ${cxWorld > 0 ? '+' : ''}${cxWorld}m 远征靶垫`;
+      const tw = ctx.measureText(label).width + 14;
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.roundRect(cPos.x - tw * 0.5, topY + 13, tw, 18, 5); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.fillText(label, cPos.x, topY + 26);
+    }
+    ctx.restore();
+  }
+
   renderOnce = function(dt = 0) {
     const nowSec = performance.now() * 0.001;
     drawBackground(nowSec);
     drawDeskAndCoaster();
     drawBottleAndFluid();
     applySkinPostProcess();
+    drawPostSkinLabels();
     drawAimPreview();
     drawConfetti(dt);
   };
@@ -3391,9 +3911,10 @@ var b2_fixtureContactFilterParticle=1<<16;var b2_particleContactFilterParticle=1
     if (spaceCharging) spaceChargeT += dt;
     stepPhysics(dt);
 
-    const camK = 1.0 - Math.exp(-8.5 * dt);
+    const camK = 1.0 - Math.exp(-9.5 * dt);
     camX += (targetCamX - camX) * camK;
     camY += (targetCamY - camY) * camK;
+    camZoom += (targetCamZoom - camZoom) * camK;
 
     renderOnce(dt);
     requestAnimationFrame(frame);
