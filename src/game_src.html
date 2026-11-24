@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>真实流体立水瓶 — Google LiquidFun 桌面解压物理挑战</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #ece4d7; color: #f4f7ff;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      touch-action: none;
+    }
+    html.transparent-bg, html.transparent-bg body {
+      background: transparent !important;
+    }
+    canvas#game { display: block; width: 100vw; height: 100vh; cursor: grab; }
+    canvas#game:active { cursor: grabbing; }
+
+    /* Native Desktop Widget Micro-Titlebar (?widget=1) */
+    #widget-bar {
+      display: none; position: fixed; top: 6px; left: 8px; right: 8px; z-index: 30;
+      align-items: center; justify-content: space-between; gap: 6px;
+      background: rgba(15, 23, 42, 0.80); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 99px;
+      padding: 4px 10px; font-size: 11.5px; font-weight: 800; color: #e2e8f0;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+      opacity: 0.32; transition: opacity 0.2s;
+    }
+    body:hover #widget-bar { opacity: 0.96; }
+    .wb-drag { display: flex; align-items: center; gap: 6px; cursor: move; flex: 1; padding: 2px 4px; white-space: nowrap; overflow: hidden; }
+    .wb-streak { color: #ffd166; font-variant-numeric: tabular-nums; }
+    .wb-actions { display: flex; align-items: center; gap: 4px; }
+    .wb-btn {
+      background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0; border-radius: 99px; padding: 2px 7px; font-size: 11px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .wb-btn:hover { background: rgba(255, 255, 255, 0.22); }
+    .wb-btn.active { background: #ffd166; color: #1a1404; border-color: #ffd166; }
+    .wb-btn.close:hover { background: #ef4444; border-color: #ef4444; color: #fff; }
+
+    /* Top HUD */
+    .hud-top {
+      position: fixed; top: 12px; left: 12px; right: 12px; z-index: 20;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+      pointer-events: none;
+    }
+    .score-card {
+      pointer-events: auto;
+      background: rgba(18, 24, 38, 0.86); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 15px;
+      padding: 10px 15px; min-width: 196px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+    .score-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .total-pts { font-size: 28px; font-weight: 900; color: #ffd166; font-variant-numeric: tabular-nums; line-height: 1; }
+    .streak-pill {
+      font-size: 12px; font-weight: 900; color: #1a1404; background: #ffd166;
+      padding: 2px 8px; border-radius: 99px; font-variant-numeric: tabular-nums;
+    }
+    .best-row { font-size: 11px; color: #94a3b8; margin-top: 5px; font-weight: 600; display: flex; gap: 10px; }
+    .best-row b { color: #5eead4; }
+
+    .mode-bar {
+      pointer-events: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;
+    }
+    .pill-btn {
+      background: rgba(18, 24, 38, 0.85); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.16); color: #dce6fa;
+      padding: 7px 12px; border-radius: 99px; font-size: 12px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    }
+    .pill-btn:hover { background: rgba(34, 45, 70, 0.92); border-color: rgba(255, 209, 102, 0.55); }
+    .pill-btn.active { background: #ffd166; color: #1a1404; border-color: #ffd166; }
+
+    /* Skin Selector Bar */
+    .skin-bar {
+      position: fixed; top: 62px; right: 12px; z-index: 20;
+      display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;
+    }
+    .skin-btn {
+      background: rgba(18, 24, 38, 0.78); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1;
+      padding: 5px 10px; border-radius: 99px; font-size: 11.5px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .skin-btn:hover { background: rgba(34, 45, 70, 0.9); color: #fff; }
+    .skin-btn.active { background: #38bdf8; color: #082f49; border-color: #7dd3fc; }
+
+    /* Physics telemetry badge (visible in X-Ray mode) */
+    #phys-hud {
+      position: fixed; top: 92px; left: 12px; z-index: 20; pointer-events: none;
+      background: rgba(10, 15, 26, 0.85); border: 1px solid rgba(94, 234, 212, 0.45);
+      border-radius: 10px; padding: 8px 12px; font-family: monospace; font-size: 11px;
+      color: #5eead4; display: none; line-height: 1.55;
+    }
+    #phys-hud.show { display: block; }
+
+    /* Center Status & Score Breakdown Receipt */
+    #banner {
+      position: fixed; top: 23%; left: 50%; transform: translate(-50%, -50%) scale(0.86);
+      z-index: 25; pointer-events: none; text-align: center;
+      opacity: 0; transition: all 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+      min-width: 280px;
+    }
+    #banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .banner-pts {
+      font-size: 42px; font-weight: 900; letter-spacing: 0.5px; color: #ffd166;
+      -webkit-text-stroke: 1.5px rgba(15, 23, 42, 0.78);
+      text-shadow: 0 5px 18px rgba(15, 23, 42, 0.55), 0 2px 4px rgba(0, 0, 0, 0.75);
+      line-height: 1.05;
+    }
+    .banner-main {
+      font-size: 20px; font-weight: 900; color: #ffffff; margin-top: 2px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
+    }
+    .banner-tags {
+      margin-top: 7px; display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 5px;
+      background: rgba(15, 23, 42, 0.86); backdrop-filter: blur(8px);
+      padding: 6px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+    }
+    .b-tag {
+      font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px;
+      background: rgba(255, 255, 255, 0.10); color: #e2e8f0;
+    }
+    .b-tag.gold { background: rgba(255, 209, 102, 0.22); color: #ffd166; border: 1px solid rgba(255, 209, 102, 0.4); }
+    .b-tag.pink { background: rgba(244, 114, 182, 0.22); color: #f9a8d4; border: 1px solid rgba(244, 114, 182, 0.4); }
+    .b-tag.cyan { background: rgba(56, 189, 248, 0.22); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    /* Scoring Rules Modal */
+    #rules-modal {
+      display: none; position: fixed; inset: 0; z-index: 45;
+      background: rgba(10, 15, 28, 0.62); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    #rules-modal.show { display: flex; }
+    .rules-box {
+      background: rgba(18, 25, 40, 0.96); border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 18px; max-width: 480px; width: 100%; padding: 18px 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); color: #e2e8f0;
+    }
+    .rules-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .rules-hdr h3 { font-size: 16px; color: #ffd166; }
+    .rules-close { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 28px; height: 28px; border-radius: 99px; cursor: pointer; font-weight: 900; }
+    .rules-grid { display: grid; gap: 8px; font-size: 12px; line-height: 1.55; }
+    .r-item { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 8px 11px; }
+    .r-item b { color: #5eead4; }
+    .r-formula { text-align: center; font-size: 11.5px; color: #ffd166; background: rgba(255,209,102,0.1); padding: 6px; border-radius: 8px; margin-bottom: 8px; font-weight: 800; }
+
+    /* Bottom Control Dock */
+    .dock {
+      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 20;
+      background: rgba(18, 24, 38, 0.88); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px;
+      padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+      max-width: calc(100vw - 20px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.38);
+    }
+    .water-ctrl { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; }
+    .water-ctrl input[type="range"] { width: 115px; accent-color: #38bdf8; cursor: pointer; }
+    .water-val { min-width: 40px; text-align: right; color: #38bdf8; font-family: monospace; font-size: 13px; font-weight: 900; }
+    .water-hint { font-size: 10.5px; color: #5eead4; background: rgba(94, 234, 212, 0.15); padding: 2px 7px; border-radius: 6px; font-weight: 800; }
+    .bottle-tabs { display: flex; gap: 5px; }
+    .b-btn {
+      background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1; padding: 5px 9px; border-radius: 9px; font-size: 11.5px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .b-btn.active { background: rgba(56, 189, 248, 0.22); border-color: #38bdf8; color: #e0f2fe; }
+    .reset-btn {
+      background: #ef4444; border: none; color: #fff; padding: 6px 12px;
+      border-radius: 9px; font-size: 12px; font-weight: 800; cursor: pointer;
+    }
+    .reset-btn:hover { background: #dc2626; }
+
+    /* Guide Hint */
+    #hint-tip {
+      position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 15;
+      font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.92);
+      background: rgba(18, 24, 38, 0.78); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 6px 15px; border-radius: 99px;
+      pointer-events: none; white-space: nowrap; transition: opacity 0.4s;
+    }
+
+    /* Widget Compact Mode Overrides */
+    body.widget-mode #widget-bar { display: flex; }
+    body.widget-mode .hud-top, body.widget-mode .skin-bar, body.widget-mode #hint-tip { display: none; }
+    body.widget-mode .dock {
+      bottom: 6px; padding: 6px 10px; gap: 6px; border-radius: 13px;
+      background: rgba(15, 23, 42, 0.86);
+    }
+    body.widget-mode .water-lbl, body.widget-mode .water-hint, body.widget-mode .b-label { display: none; }
+    body.widget-mode .water-ctrl input[type="range"] { width: 64px; }
+    body.widget-mode .b-btn { padding: 4px 7px; font-size: 13px; }
+    body.widget-mode .reset-btn { padding: 4px 8px; font-size: 11px; }
+    body.widget-mode .banner-pts { font-size: 28px; }
+    body.widget-mode .banner-main { font-size: 15px; }
+    body.widget-mode .banner-tags { padding: 4px 8px; gap: 4px; }
+    body.widget-mode .b-tag { font-size: 10px; }
+
+    @media (max-width: 920px) {
+      #hint-tip { top: auto; bottom: 118px; font-size: 11px; }
+    }
+    @media (max-width: 640px) {
+      .dock { padding: 8px 10px; gap: 8px; bottom: 10px; }
+      .water-ctrl input[type="range"] { width: 82px; }
+      .total-pts { font-size: 22px; }
+      .skin-bar { top: 68px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- Compact Desktop Widget Bar (?widget=1) -->
+  <div id="widget-bar">
+    <div class="wb-drag" id="wb-drag" title="按住拖动桌面位置">
+      <span>⠿ 🧴 立水瓶</span>
+      <span class="wb-streak"><b id="wb-score-num">0</b>分 · 🔥<b id="wb-streak-num">0</b></span>
+    </div>
+    <div class="wb-actions">
+      <button class="wb-btn" id="wb-skin" title="切换视觉皮肤 (写实/麦金塔/ASCII/掌机/霓虹)">🎨</button>
+      <button class="wb-btn" id="wb-bg" title="切换透明桌宠 / 书房背景">🪟</button>
+      <button class="wb-btn active" id="wb-pin" title="窗口置顶开关">📌</button>
+      <button class="wb-btn" id="wb-sfx" title="音效开关">🔊</button>
+      <button class="wb-btn" id="wb-min" title="隐藏到系统托盘 (Alt+B)">➖</button>
+      <button class="wb-btn close" id="wb-close" title="退出挂件">✕</button>
+    </div>
+  </div>
+
+  <div class="hud-top">
+    <div class="score-card">
+      <div class="score-row">
+        <div>
+          <span class="total-pts" id="total-pts">0</span>
+          <span style="font-size:11px;color:#94a3b8;font-weight:800;"> 分</span>
+        </div>
+        <span class="streak-pill" id="streak-pill">🔥 0 连击</span>
+      </div>
+      <div class="best-row">
+        <span>单次最高: <b id="best-shot">0</b></span>
+        <span>最高连击: <b id="best-streak">0</b></span>
+        <span>倒立: <b id="cap-num">0</b></span>
+      </div>
+    </div>
+
+    <div class="mode-bar">
+      <button class="pill-btn" id="btn-rules">📜 计分细则</button>
+      <button class="pill-btn" id="btn-widget-toggle">📌 极简挂件</button>
+      <button class="pill-btn" id="btn-xray">🔬 物理透视</button>
+      <button class="pill-btn" id="btn-sfx">🔊 音效开</button>
+    </div>
+  </div>
+
+  <div class="skin-bar" id="skin-bar">
+    <button class="skin-btn active" data-skin="studio">📷 写实原木</button>
+    <button class="skin-btn" data-skin="mac">🍎 麦金塔 1-Bit</button>
+    <button class="skin-btn" data-skin="ascii">💻 极客 ASCII</button>
+    <button class="skin-btn" data-skin="gb">👾 复古掌机</button>
+    <button class="skin-btn" data-skin="crt">🌆 赛博 CRT</button>
+  </div>
+
+  <div id="phys-hud">
+    <div>引擎: Google LiquidFun (Box2D + SPH)</div>
+    <div id="ph-particles">SPH 水粒子: 0 颗</div>
+    <div id="ph-omega">角速度 ω: 0.00 rad/s</div>
+    <div id="ph-angle">倾角 θ: 0.0°</div>
+    <div id="ph-cm">动态质心偏移: 0.0 cm</div>
+  </div>
+
+  <div id="banner">
+    <div class="banner-pts" id="banner-pts">+140 分</div>
+    <div class="banner-main" id="banner-main">✨ 稳稳立住！</div>
+    <div class="banner-tags" id="banner-tags"></div>
+  </div>
+
+  <div id="rules-modal">
+    <div class="rules-box">
+      <div class="rules-hdr">
+        <h3>📜 立水瓶硬核难度计分细则</h3>
+        <button class="rules-close" id="rules-close">✕</button>
+      </div>
+      <div class="r-formula">单次得分 = 基础姿态分 × 圈数倍率 × 水量难度 × 瓶型系数 × 特技加成 × 连击倍率</div>
+      <div class="rules-grid">
+        <div class="r-item"><b>1. 落地姿态基础分</b>：正立落台 <b>100分</b> · 横躺挑立 <b>80分</b> · 🙃 <b>瓶盖倒立绝杀 350分</b>！</div>
+        <div class="r-item"><b>2. 空翻周数倍率</b>：1周(360°) <b>×1.0</b> · 1.5周 <b>×1.8</b> · 2周(720°) <b>×2.6</b> · 3周(1080°) <b>×5.0</b> · 4周+ <b>×8.5</b></div>
+        <div class="r-item"><b>3. 水量极限难度</b>：25%~45%黄金区 <b>×1.0</b> · 15%~20%/50%~65% <b>×1.4</b> · 5%~10%/70%~80% <b>×2.2</b> · <b>85%~95%满水 ×3.0</b> · <b>0%纯空瓶 ×3.5</b>！</div>
+        <div class="r-item"><b>4. 瓶型难度系数</b>：🥛草莓牛奶 <b>×0.9</b> · 💧农夫山泉 <b>×1.0</b> · 🥤可口可乐 <b>×1.2</b> · 🍾玻璃汽水(高弹窄盖) <b>×1.5</b></div>
+        <div class="r-item"><b>5. 桌面特技与连击</b>：🎯 <b>正中软木杯垫 ×1.4</b> · ⚡ <b>零晃动垂直秒稳 ×1.3</b> · ⚖️ <b>边缘达摩摇晃救回 ×1.5</b> · 每连击额外 <b>+20%</b>（最高 ×3.0）！</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hint-tip">👆 按住任意位置向上拖拽抛瓶（瞄准桌面中央杯垫得分更高 · 躺倒也能直接挑起）</div>
+
+  <div class="dock">
+    <div class="water-ctrl">
+      <span class="water-lbl">💧 水量</span>
+      <input type="range" id="water-slider" min="0" max="95" step="5" value="35">
+      <span class="water-val" id="water-val">35%</span>
+      <span class="water-hint" id="water-hint">×1.0 黄金区</span>
+    </div>
+    <div class="bottle-tabs" id="bottle-tabs">
+      <button class="b-btn active" data-type="water" title="农夫山泉 550ml (×1.0)">💧<span class="b-label"> 农夫山泉</span></button>
+      <button class="b-btn" data-type="cola" title="可口可乐 500ml (×1.2)">🥤<span class="b-label"> 可口可乐</span></button>
+      <button class="b-btn" data-type="milk" title="草莓牛奶 350ml (×0.9)">🥛<span class="b-label"> 草莓牛奶</span></button>
+      <button class="b-btn" data-type="glass" title="玻璃汽水 330ml (×1.5)">🍾<span class="b-label"> 玻璃汽水</span></button>
+    </div>
+    <button class="reset-btn" id="btn-reset" title="扶正回杯垫中央 (R)">↺<span class="b-label"> 扶正</span></button>
+  </div>
+
+  <!-- BOTTLE_ASSETS_PLACEHOLDER -->
+  <!-- LIQUIDFUN_INLINE_PLACEHOLDER -->
+
+<script>
+(() => {
+  // ============================================================================
+  // 1. Storage & Multi-Modal Synthesized WebAudio SFX (Zero External Files)
+  // ============================================================================
+  const memStore = {};
+  const Store = {
+    get(k, fb) {
+      try {
+        if (window.BiliToySDK && window.BiliToySDK.getStorage) {
+          const v = window.BiliToySDK.getStorage(k); if (v != null) return JSON.parse(v);
+        }
+        if (window.bl && window.bl.getStorageSync) {
+          const v = window.bl.getStorageSync(k); if (v) return JSON.parse(v);
+        }
+        const raw = localStorage.getItem(k); if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return memStore[k] !== undefined ? memStore[k] : fb;
+    },
+    set(k, val) {
+      memStore[k] = val;
+      const s = JSON.stringify(val);
+      try {
+        if (window.BiliToySDK && window.BiliToySDK.setStorage) window.BiliToySDK.setStorage(k, s);
+        if (window.bl && window.bl.setStorageSync) window.bl.setStorageSync(k, s);
+        localStorage.setItem(k, s);
+      } catch (e) {}
+    }
+  };
+
+  let sfxEnabled = true;
+  let actx = null;
+  function ensureAudio() {
+    if (!sfxEnabled) return null;
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) actx = new AC();
+    }
+    if (actx && actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+
+  function playWhoosh(power) {
+    const c = ensureAudio(); if (!c) return;
+    const now = c.currentTime;
+    const osc = c.createOscillator(), g = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(160 + power * 90, now);
+    osc.frequency.exponentialRampToValueAtTime(420 + power * 180, now + 0.14);
+    g.gain.setValueAtTime(0.001, now);
+    g.gain.linearRampToValueAtTime(0.15, now + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    osc.connect(g); g.connect(c.destination);
+    osc.start(now); osc.stop(now + 0.2);
+  }
+
+  let lastThudMs = 0;
+  function playThud(impulse, isGlass) {
+    const nowMs = performance.now();
+    if (nowMs - lastThudMs < 50 || impulse < 0.70) return;
+    lastThudMs = nowMs;
+    const c = ensureAudio(); if (!c) return;
+    const now = c.currentTime;
+    const strength = Math.min(1.0, impulse / 9.0);
+
+    if (isGlass) {
+      [740, 1580].forEach((f, idx) => {
+        const osc = c.createOscillator(), g = c.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f + strength * 60, now);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.92, now + 0.11);
+        g.gain.setValueAtTime(strength * (idx === 0 ? 0.22 : 0.10), now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + (idx === 0 ? 0.12 : 0.08));
+        osc.connect(g); g.connect(c.destination);
+        osc.start(now); osc.stop(now + 0.13);
+      });
+    } else {
+      // Wood desk thump + hollow PET plastic shell resonance
+      const thump = c.createOscillator(), tg = c.createGain();
+      thump.type = 'sine';
+      thump.frequency.setValueAtTime(155 + strength * 85, now);
+      thump.frequency.exponentialRampToValueAtTime(50, now + 0.085);
+      tg.gain.setValueAtTime(strength * 0.25, now);
+      tg.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
+      thump.connect(tg); tg.connect(c.destination);
+      thump.start(now); thump.stop(now + 0.10);
+
+      const shell = c.createOscillator(), sg = c.createGain();
+      shell.type = 'triangle';
+      const hollowHz = waterPct < 15 ? 650 : 485;
+      shell.frequency.setValueAtTime(hollowHz + strength * 140, now);
+      shell.frequency.exponentialRampToValueAtTime(hollowHz * 0.62, now + 0.055);
+      sg.gain.setValueAtTime(strength * 0.12, now);
+      sg.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      shell.connect(sg); sg.connect(c.destination);
+      shell.start(now); shell.stop(now + 0.065);
+    }
+  }
+
+  function playWin(isHighTier) {
+    const c = ensureAudio(); if (!c) return;
+    const now = c.currentTime;
+    const notes = isHighTier ? [523.25, 659.25, 783.99, 1046.5, 1318.5] : [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((f, i) => {
+      const osc = c.createOscillator(), g = c.createGain();
+      osc.type = skinMode === 'gb' || skinMode === 'mac' ? 'square' : 'triangle';
+      const vol = skinMode === 'gb' || skinMode === 'mac' ? 0.09 : 0.18;
+      osc.frequency.setValueAtTime(f, now + i * 0.065);
+      g.gain.setValueAtTime(0.001, now + i * 0.065);
+      g.gain.linearRampToValueAtTime(vol, now + i * 0.065 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.065 + 0.28);
+      osc.connect(g); g.connect(c.destination);
+      osc.start(now + i * 0.065); osc.stop(now + i * 0.065 + 0.3);
+    });
+  }
+
+  // ============================================================================
+  // 2. Photorealistic Bottle Presets & Difficulty Multipliers
+  // ============================================================================
+  const BOTTLES = {
+    water: {
+      name: '农夫山泉', diffMult: 1.0, halfW: 0.296, halfH: 1.06, capHalfRatio: 0.47,
+      shoulderY: 0.34, baseRest: 0.02, bodyRest: 0.28, density: 0.30,
+      centerColor: [222, 244, 255], edgeColor: [96, 182, 235], rimColor: [250, 254, 255],
+      centerAlpha: 88, edgeAlpha: 188, rimAlpha: 245, isGlass: false
+    },
+    cola: {
+      name: '可口可乐', diffMult: 1.2, halfW: 0.319, halfH: 1.08, capHalfRatio: 0.43,
+      shoulderY: 0.22, baseRest: 0.02, bodyRest: 0.30, density: 0.31,
+      centerColor: [24, 6, 3], edgeColor: [118, 30, 8], rimColor: [216, 148, 84],
+      centerAlpha: 248, edgeAlpha: 236, rimAlpha: 248, isGlass: false
+    },
+    milk: {
+      name: '草莓牛奶', diffMult: 0.9, halfW: 0.432, halfH: 0.94, capHalfRatio: 0.66,
+      shoulderY: 0.44, baseRest: 0.02, bodyRest: 0.24, density: 0.30,
+      centerColor: [253, 188, 212], edgeColor: [222, 128, 164], rimColor: [255, 240, 246],
+      centerAlpha: 248, edgeAlpha: 248, rimAlpha: 252, isGlass: false
+    },
+    glass: {
+      name: '玻璃汽水', diffMult: 1.5, halfW: 0.313, halfH: 1.12, capHalfRatio: 0.36,
+      shoulderY: 0.12, baseRest: 0.05, bodyRest: 0.38, density: 0.46,
+      centerColor: [196, 255, 212], edgeColor: [52, 196, 98], rimColor: [242, 255, 246],
+      centerAlpha: 105, edgeAlpha: 192, rimAlpha: 245, isGlass: true
+    }
+  };
+
+  const SKINS = ['studio', 'mac', 'ascii', 'gb', 'crt'];
+  const SKIN_NAMES = { studio: '📷 写实', mac: '🍎 麦金塔', ascii: '💻 ASCII', gb: '👾 掌机', crt: '🌆 CRT' };
+
+  let renderOnce = () => {};
+  const spriteCache = {};
+  function toGpuCanvas(img) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth || img.width;
+    c.height = img.naturalHeight || img.height;
+    c.getContext('2d').drawImage(img, 0, 0);
+    return c;
+  }
+  if (window.BOTTLE_SPRITES) {
+    for (const [k, data] of Object.entries(window.BOTTLE_SPRITES)) {
+      const entry = { ...data, backImg: null, frontImg: null };
+      spriteCache[k] = entry;
+      const bImg = new Image(), fImg = new Image();
+      bImg.onload = () => { entry.backImg = toGpuCanvas(bImg); renderOnce(); };
+      fImg.onload = () => { entry.frontImg = toGpuCanvas(fImg); renderOnce(); };
+      bImg.src = data.back;
+      fImg.src = data.front;
+    }
+  }
+
+  // ============================================================================
+  // 3. Google LiquidFun World & C1-Smooth Capsule-Circle Outer Hull
+  // ============================================================================
+  const urlParams = new URLSearchParams(location.search);
+  let widgetMode = urlParams.get('widget') === '1';
+  let transparentBg = urlParams.get('transparent') === '1';
+  let skinMode = Store.get('bf_skin', 'studio');
+  if (!SKINS.includes(skinMode)) skinMode = 'studio';
+  if (widgetMode) document.body.classList.add('widget-mode');
+  if (transparentBg) document.documentElement.classList.add('transparent-bg');
+
+  let world = null, bottleBody = null, particleSystem = null;
+  let deskHalfW = 8.2;
+  const COASTER_HALF_W = 0.62; // Target cork coaster at x = 0!
+  let bottleKey = 'water';
+  let waterPct = 35;
+  let xrayMode = false;
+
+  let totalScore = Store.get('bf_total_score', 0);
+  let bestShot = Store.get('bf_best_shot', 0);
+  let streak = 0;
+  let bestStreak = Store.get('bf_best_streak', 0);
+  let capCount = Store.get('bf_cap_count', 0);
+
+  // Flight & precision tracking
+  let state = 'ready'; // 'ready' | 'flying'
+  let settleTimer = 0;
+  let throwTime = 0;
+  let startAngle = 0;
+  let cumulativeSpin = 0;
+  let totalAbsSpin = 0;
+  let lastBottleAngle = 0;
+  let peakAirHeight = 0;
+  let touchedDown = false;
+  let touchdownTilt = 0;
+  let maxWobbleTilt = 0;
+  let prevVelX = 0, prevVelY = 0, prevOmega = 0;
+
+  // Fixed-timestep 240Hz accumulator + pose interpolation
+  const FIXED_DT = 1 / 240;
+  let physAccum = 0;
+  let prevRenderX = 0, prevRenderY = 1.1, prevRenderAng = 0;
+  let currRenderX = 0, currRenderY = 1.1, currRenderAng = 0;
+  let renderAlpha = 1.0;
+
+  const confetti = [];
+  const dustMotes = Array.from({ length: 22 }, (_, i) => ({
+    x: (i * 0.73) % 1, y: (i * 0.41) % 1, r: 1.2 + (i % 3) * 0.8, sp: 0.008 + (i % 4) * 0.004
+  }));
+
+  let camX = 0, camY = 1.52, camZoom = 1.0;
+  let targetCamX = 0, targetCamY = 1.52;
+
+  let dragging = false;
+  let dragStart = { x: 0, y: 0 }, dragCur = { x: 0, y: 0 };
+  let spaceCharging = false, spaceChargeT = 0;
+
+  function getWaterDifficulty(pct) {
+    if (pct === 0) return { mult: 3.5, label: '0%空瓶宗师 ×3.5', hint: '×3.5 空瓶极限', col: '#fb7185' };
+    if (pct <= 10) return { mult: 2.2, label: `${pct}%极少水 ×2.2`, hint: '×2.2 极轻高难', col: '#f472b6' };
+    if (pct <= 20) return { mult: 1.4, label: `${pct}%少水 ×1.4`, hint: '×1.4 进阶偏轻', col: '#93c5fd' };
+    if (pct <= 45) return { mult: 1.0, label: `${pct}%黄金水量`, hint: '×1.0 黄金区', col: '#5eead4' };
+    if (pct <= 65) return { mult: 1.4, label: `${pct}%偏满 ×1.4`, hint: '×1.4 进阶偏重', col: '#93c5fd' };
+    if (pct <= 80) return { mult: 2.2, label: `${pct}%高水位 ×2.2`, hint: '×2.2 重心偏高', col: '#fbbf24' };
+    return { mult: 3.0, label: `${pct}%满水硬核 ×3.0`, hint: '×3.0 满水极限', col: '#fb7185' };
+  }
+
+  function updateHudNumbers() {
+    document.getElementById('total-pts').textContent = totalScore.toLocaleString();
+    document.getElementById('streak-pill').textContent = `🔥 ${streak} 连击`;
+    document.getElementById('best-shot').textContent = bestShot.toLocaleString();
+    document.getElementById('best-streak').textContent = bestStreak;
+    document.getElementById('cap-num').textContent = capCount;
+    const wbSt = document.getElementById('wb-streak-num');
+    const wbSc = document.getElementById('wb-score-num');
+    if (wbSt) wbSt.textContent = streak;
+    if (wbSc) wbSc.textContent = totalScore;
+  }
+
+  let bannerTimer = null;
+  function showScoreBanner(pts, mainTitle, tags, ptsColor = '#ffd166') {
+    const el = document.getElementById('banner');
+    const pEl = document.getElementById('banner-pts');
+    const mEl = document.getElementById('banner-main');
+    const tEl = document.getElementById('banner-tags');
+    pEl.textContent = `+${pts} 分`;
+    pEl.style.color = ptsColor;
+    mEl.textContent = mainTitle;
+    tEl.innerHTML = tags.map(t => `<span class="b-tag ${t.cls || ''}">${t.text}</span>`).join('');
+    el.classList.add('show');
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  function spawnConfetti(wx, wy, count = 48) {
+    const cols = ['#ffd166', '#38bdf8', '#f472b6', '#34d399', '#fb7185', '#a78bfa'];
+    for (let i = 0; i < count; i++) {
+      const ang = -Math.PI * 0.15 - Math.random() * Math.PI * 0.7;
+      const spd = 2.5 + Math.random() * 6.5;
+      confetti.push({
+        x: wx, y: wy,
+        vx: Math.cos(ang) * spd, vy: Math.sin(ang) * -spd,
+        sz: 4 + Math.random() * 5, c: cols[i % cols.length],
+        rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 12,
+        life: 1.1 + Math.random() * 0.7
+      });
+    }
+  }
+
+  function addStaticBox(cx, cy, hx, hy, friction, restitution) {
+    const bd = new b2BodyDef();
+    bd.type = b2_staticBody;
+    bd.position.Set(cx, cy);
+    const b = world.CreateBody(bd);
+    const s = new b2PolygonShape();
+    s.SetAsBoxXY(hx, hy);
+    const fd = new b2FixtureDef();
+    fd.shape = s; fd.friction = friction; fd.restitution = restitution;
+    b.CreateFixtureFromDef(fd);
+    return b;
+  }
+
+  function rebuildWorld() {
+    world = new b2World(new b2Vec2(0, -16.8));
+    window.world = world;
+
+    const estPpm = Math.max(60, Math.min(window.innerWidth, window.innerHeight) * 0.158);
+    deskHalfW = widgetMode
+      ? Math.max(2.05, (window.innerWidth / estPpm) * 0.47)
+      : Math.max(5.8, (window.innerWidth / estPpm) * 0.48);
+
+    // Desk restitution = 0.0 so Box2D max(r_bottle, r_desk) uses each bottle part's EXACT restitution
+    // (0.02 dead-blow base for crisp upright sticking, 0.28..0.38 elastic body/shoulders for realistic side bounces!)
+    addStaticBox(0, -0.5, deskHalfW + 1.2, 0.5, 0.88, 0.0);
+    // Elastic side boundary walls + high ceiling so hard throws rebound onto the desk naturally
+    addStaticBox(-(deskHalfW + 0.35), 5.0, 0.35, 8.0, 0.30, 0.44);
+    addStaticBox( (deskHalfW + 0.35), 5.0, 0.35, 8.0, 0.30, 0.44);
+    addStaticBox(0, 12.0, deskHalfW + 1.2, 0.4, 0.30, 0.32);
+
+    const spawnY = BOTTLES[bottleKey].halfH + 0.01;
+    createBottleAndWater(0, spawnY);
+
+    state = 'ready';
+    settleTimer = 0;
+    physAccum = 0;
+    cumulativeSpin = 0;
+    totalAbsSpin = 0;
+    lastBottleAngle = 0;
+    peakAirHeight = 0;
+    touchedDown = false;
+    prevVelX = 0; prevVelY = 0; prevOmega = 0;
+
+    const initPos = bottleBody.GetPosition();
+    prevRenderX = currRenderX = initPos.x;
+    prevRenderY = currRenderY = initPos.y;
+    prevRenderAng = currRenderAng = bottleBody.GetAngle();
+    renderAlpha = 1.0;
+
+    targetCamX = 0;
+    targetCamY = widgetMode ? 1.46 : 1.52;
+    updateHudNumbers();
+    renderOnce();
+  }
+
+  function createBottleAndWater(cx, cy) {
+    const cfg = BOTTLES[bottleKey];
+    const hw = cfg.halfW, hh = cfg.halfH;
+
+    const bd = new b2BodyDef();
+    bd.type = b2_dynamicBody;
+    bd.position.Set(cx, cy);
+    bd.bullet = true;
+    bd.linearDamping = 0.015;
+    bd.angularDamping = 0.038;
+    bottleBody = world.CreateBody(bd);
+
+    // C1-SMOOTH TANGENT CAPSULE-CIRCLE OUTER HULL:
+    // 6 smooth b2CircleShape corners + 6 tangent wall segments whose vertices sit strictly inside the circles!
+    // Eliminates 100% of Box2D multi-fixture protruding sawteeth / ghost-vertex kicks!
+    const addCircle = (lx, ly, r, densMul, fric, rest) => {
+      const c = new b2CircleShape();
+      c.position.Set(lx, ly); c.radius = r;
+      const fd = new b2FixtureDef();
+      fd.shape = c; fd.density = cfg.density * densMul; fd.friction = fric; fd.restitution = rest;
+      bottleBody.CreateFixtureFromDef(fd);
+    };
+    const addCapsuleSeg = (x1, y1, x2, y2, r, densMul, fric, rest) => {
+      const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
+      const hl = Math.hypot(x2 - x1, y2 - y1) * 0.5;
+      const ang = Math.atan2(y2 - y1, x2 - x1);
+      const sh = new b2PolygonShape();
+      sh.SetAsBoxXYCenterAngle(hl, r, new b2Vec2(mx, my), ang);
+      const fd = new b2FixtureDef();
+      fd.shape = sh; fd.density = cfg.density * densMul; fd.friction = fric; fd.restitution = rest;
+      bottleBody.CreateFixtureFromDef(fd);
+    };
+
+    const r = 0.035; // > psd.radius (0.031)
+    const capHw = hw * cfg.capHalfRatio;
+    const bx = hw - r, by = -hh + r; // full-width smooth rounded base corners!
+    const sx = hw - r, sy = hh * cfg.shoulderY;
+    const cxTop = Math.max(r * 1.05, capHw - r), cyTop = hh - r;
+
+    // Smooth corner circles
+    addCircle(-bx, by, r, 1.5, 0.88, cfg.baseRest);
+    addCircle( bx, by, r, 1.5, 0.88, cfg.baseRest);
+    addCircle(-sx, sy, r, 0.9, 0.52, cfg.bodyRest);
+    addCircle( sx, sy, r, 0.9, 0.52, cfg.bodyRest);
+    addCircle(-cxTop, cyTop, r, 1.1, 0.86, cfg.baseRest);
+    addCircle( cxTop, cyTop, r, 1.1, 0.86, cfg.baseRest);
+
+    // Smooth tangent segments (zero protruding box corners!)
+    addCapsuleSeg(-bx, by, bx, by, r, 1.85, 0.90, cfg.baseRest);         // Standing flat base
+    addCapsuleSeg(-bx, by, -sx, sy, r, 0.95, 0.52, cfg.bodyRest);        // Left cylindrical body
+    addCapsuleSeg( bx, by,  sx, sy, r, 0.95, 0.52, cfg.bodyRest);        // Right cylindrical body
+    addCapsuleSeg(-sx, sy, -cxTop, cyTop, r, 0.85, 0.50, cfg.bodyRest);  // Left tapered shoulder/neck
+    addCapsuleSeg( sx, sy,  cxTop, cyTop, r, 0.85, 0.50, cfg.bodyRest);  // Right tapered shoulder/neck
+    addCapsuleSeg(-cxTop, cyTop, cxTop, cyTop, r, 1.2, 0.86, cfg.baseRest); // Flat screw/crown cap
+
+    // Google LiquidFun SPH Fluid
+    const psd = new b2ParticleSystemDef();
+    psd.radius = 0.031;
+    psd.density = 0.78;
+    psd.dampingStrength = 0.014;
+    psd.pressureStrength = 0.05;
+    psd.viscousStrength = 0.008;
+    psd.surfaceTensionNormalStrength = 0.10;
+    psd.surfaceTensionPressureStrength = 0.08;
+    psd.maxCount = 900;
+    particleSystem = world.CreateParticleSystem(psd);
+
+    if (waterPct > 0) {
+      const innerW = Math.max(0.08, hw - r * 2 - 0.035);
+      const maxInnerH = (hh * 1.48) * (waterPct / 100);
+      const halfWaterH = Math.max(0.05, maxInnerH * 0.5);
+      const bottomInnerY = cy - hh + r * 2 + 0.035;
+
+      const pgd = new b2ParticleGroupDef();
+      pgd.flags = b2_waterParticle;
+      const wShape = new b2PolygonShape();
+      wShape.SetAsBoxXYCenterAngle(innerW, halfWaterH, new b2Vec2(cx, bottomInnerY + halfWaterH), 0);
+      pgd.shape = wShape;
+      particleSystem.CreateParticleGroup(pgd);
+    }
+  }
+
+  // ============================================================================
+  // 4. Throw Mechanics & Continuous Grab-From-Anywhere Sandbox
+  // ============================================================================
+  function computeThrowFromDrag() {
+    const rawDx = dragCur.x - dragStart.x;
+    const dx = Math.abs(rawDx) < 20 ? 0 : (rawDx - Math.sign(rawDx) * 20);
+    const dy = dragStart.y - dragCur.y;
+    const maxPx = 230;
+    const rawLen = Math.hypot(dx, dy);
+    const len = Math.min(maxPx, rawLen);
+    const power = len / maxPx;
+    const ux = rawLen > 4 ? dx / rawLen : 0;
+    const uy = rawLen > 4 ? dy / rawLen : 1;
+
+    const vx = ux * (power * 9.5);
+    const vy = Math.max(5.8, uy * (5.8 + power * 9.4));
+    const dir = Math.abs(rawDx) < 15 ? 1 : Math.sign(rawDx);
+    // Wide range: gentle flick = 180°/360°, medium = crisp 360°, full hard flick = 720°..1080° multi-flip!
+    const omega = -dir * (3.2 + power * 7.4);
+    return { vx, vy, omega, power, valid: Math.hypot(rawDx, dy) > 16 && dy > 8 };
+  }
+
+  function canGrabBottle() {
+    if (!bottleBody) return false;
+    if (state === 'ready') return true;
+    // If resting sideways on the desk after a missed throw, allow immediate re-grab;
+    // if nearly upright/cap-stand, wait the brief 0.25s settle so your score & reward ALWAYS trigger first!
+    if (performance.now() - throwTime > 320) {
+      const pos = bottleBody.GetPosition();
+      const vel = bottleBody.GetLinearVelocity();
+      const ang = Math.abs(normalizeAngle(bottleBody.GetAngle()));
+      const nearStanding = ang < 0.35 || Math.abs(ang - Math.PI) < 0.35;
+      if (!nearStanding && pos.y < 1.2 && Math.hypot(vel.x, vel.y) < 1.5) {
+        streak = 0;
+        updateHudNumbers();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function launchBottle(vx, vy, omega, power) {
+    if (!bottleBody) return;
+    ensureAudio();
+    document.getElementById('hint-tip').style.opacity = '0';
+
+    const cfg = BOTTLES[bottleKey];
+    const curAng = normalizeAngle(bottleBody.GetAngle());
+    if (Math.abs(Math.sin(curAng)) > 0.55) {
+      vy += 1.35; // natural wrist-lift clearance when picking up a sideways bottle
+    }
+
+    const pBuf = particleSystem.GetPositionBuffer();
+    const vBuf = particleSystem.GetVelocityBuffer();
+    const pCount = pBuf.length / 2;
+    const mBottle = bottleBody.GetMass();
+    const mPart = 0.78 * 0.062 * 0.062;
+    const mWater = pCount * mPart;
+    const totalM = mBottle + mWater;
+
+    bottleBody.SetAwake(true);
+    if (pCount > 0) {
+      let wx0 = 0, wy0 = 0;
+      for (let i = 0; i < pBuf.length; i += 2) { wx0 += pBuf[i]; wy0 += pBuf[i + 1]; }
+      wx0 /= pCount; wy0 /= pCount;
+
+      const dir = -Math.sign(omega) || 1;
+      const shellOmega = omega * (1.0 + 0.90 * (mWater / totalM));
+      const waterSpin = omega * 0.18;
+      const innerSpan = Math.max(0.10, cfg.halfW - 0.09);
+      const waveAmp = 2.3 + power * 2.1;
+      const ca = Math.cos(curAng), sa = Math.sin(curAng);
+
+      let sumVx = 0, sumVy = 0;
+      for (let i = 0; i < pBuf.length; i += 2) {
+        const dx = pBuf[i] - wx0, dy = pBuf[i + 1] - wy0;
+        const localSide = Math.max(-1.2, Math.min(1.2, (dx * ca + dy * sa) / innerSpan));
+        const axialSurge = (-dir * localSide) * waveAmp;
+        const uVx = vx - waterSpin * dy - sa * axialSurge;
+        const uVy = vy + waterSpin * dx + ca * axialSurge;
+        vBuf[i] = uVx; vBuf[i + 1] = uVy;
+        sumVx += uVx; sumVy += uVy;
+      }
+      const bVx = (totalM * vx - mPart * sumVx) / mBottle;
+      const bVy = (totalM * vy - mPart * sumVy) / mBottle;
+      bottleBody.SetLinearVelocity(new b2Vec2(bVx, bVy));
+      bottleBody.SetAngularVelocity(shellOmega);
+    } else {
+      bottleBody.SetLinearVelocity(new b2Vec2(vx, vy));
+      bottleBody.SetAngularVelocity(omega * 1.32);
+    }
+
+    const initPos = bottleBody.GetPosition();
+    prevRenderX = currRenderX = initPos.x;
+    prevRenderY = currRenderY = initPos.y;
+    prevRenderAng = currRenderAng = bottleBody.GetAngle();
+    physAccum = 0;
+    renderAlpha = 1.0;
+
+    state = 'flying';
+    throwTime = performance.now();
+    settleTimer = 0;
+    startAngle = curAng;
+    lastBottleAngle = bottleBody.GetAngle();
+    cumulativeSpin = 0;
+    totalAbsSpin = 0;
+    peakAirHeight = 0;
+    touchedDown = false;
+    touchdownTilt = 0;
+    maxWobbleTilt = 0;
+    playWhoosh(power);
+  }
+
+  // ============================================================================
+  // 5. Physics Stepping & Detailed Multi-Factor Difficulty Scoring
+  // ============================================================================
+  function normalizeAngle(a) {
+    let r = a % (Math.PI * 2);
+    if (r > Math.PI) r -= Math.PI * 2;
+    if (r < -Math.PI) r += Math.PI * 2;
+    return r;
+  }
+
+  function stepSingleFixed() {
+    const cfg = BOTTLES[bottleKey];
+    prevRenderX = currRenderX;
+    prevRenderY = currRenderY;
+    prevRenderAng = currRenderAng;
+    const preStepVy = bottleBody.GetLinearVelocity().y;
+
+    world.Step(FIXED_DT, 8, 3);
+
+    const bp = bottleBody.GetPosition();
+    const ba = bottleBody.GetAngle();
+    const postVel = bottleBody.GetLinearVelocity();
+    currRenderX = bp.x;
+    currRenderY = bp.y;
+    currRenderAng = ba;
+
+    // 3D Azimuthal Turbulent Slosh Dead-Blow Damping on base/cap touchdown!
+    // Peaks naturally around 33% golden water ratio, vanishes at 0% empty or 95% full!
+    const normA = Math.abs(normalizeAngle(ba));
+    const nearBase = normA < 0.52;
+    const nearCap = Math.abs(normA - Math.PI) < 0.28;
+    if ((nearBase || nearCap) && (postVel.y - preStepVy > 1.6) && bp.y < cfg.halfH + 0.16 && peakAirHeight > 0.18) {
+      const goldenFactor = Math.max(0, 1.0 - Math.pow((waterPct - 34) / 40, 2));
+      if (goldenFactor > 0.04) {
+        const angDamp = nearBase ? (1.0 - 0.60 * goldenFactor) : (1.0 - 0.42 * goldenFactor);
+        bottleBody.SetAngularVelocity(bottleBody.GetAngularVelocity() * angDamp);
+        bottleBody.SetLinearVelocity(new b2Vec2(postVel.x * (1.0 - 0.45 * goldenFactor), postVel.y * 0.42));
+      }
+    }
+
+    // Tapered outer safety clamp strictly outside the capsule walls
+    const maxBodyLx = cfg.halfW * 0.96;
+    const maxNeckLx = cfg.halfW * cfg.capHalfRatio * 0.98;
+    const shStart = cfg.halfH * cfg.shoulderY;
+    const shSpan = Math.max(0.15, cfg.halfH * 0.92 - shStart);
+    const minLy = -cfg.halfH + 0.052;
+    const maxLy =  cfg.halfH - 0.058;
+    const ca = Math.cos(ba), sa = Math.sin(ba);
+    const pBuf = particleSystem.GetPositionBuffer();
+    const vBuf = particleSystem.GetVelocityBuffer();
+    const bv = bottleBody.GetLinearVelocity();
+    const om = bottleBody.GetAngularVelocity();
+    for (let k = 0; k < pBuf.length; k += 2) {
+      const dx = pBuf[k] - bp.x, dy = pBuf[k + 1] - bp.y;
+      let lx =  dx * ca + dy * sa;
+      let ly = -dx * sa + dy * ca;
+      const shT = ly > shStart ? Math.min(1, (ly - shStart) / shSpan) : 0;
+      const curMaxX = maxBodyLx * (1 - shT) + maxNeckLx * shT;
+      let clamped = false;
+      if (lx > curMaxX) { lx = curMaxX; clamped = true; }
+      else if (lx < -curMaxX) { lx = -curMaxX; clamped = true; }
+      if (ly < minLy) { ly = minLy; clamped = true; }
+      else if (ly > maxLy) { ly = maxLy; clamped = true; }
+      if (clamped) {
+        const wx = lx * ca - ly * sa;
+        const wy = lx * sa + ly * ca;
+        pBuf[k]     = bp.x + wx;
+        pBuf[k + 1] = bp.y + wy;
+        vBuf[k]     = bv.x - om * wy;
+        vBuf[k + 1] = bv.y + om * wx;
+      }
+    }
+
+    const dAng = ba - lastBottleAngle;
+    cumulativeSpin += dAng;
+    totalAbsSpin += Math.abs(dAng);
+    lastBottleAngle = ba;
+  }
+
+  function stepPhysics(realDt) {
+    if (!world || !bottleBody) return;
+
+    physAccum += Math.min(0.035, realDt);
+    let steps = 0;
+    while (physAccum >= FIXED_DT && steps < 8) {
+      stepSingleFixed();
+      physAccum -= FIXED_DT;
+      steps++;
+    }
+    if (steps === 8) physAccum = 0;
+    renderAlpha = physAccum / FIXED_DT;
+
+    const pos = bottleBody.GetPosition();
+    const vel = bottleBody.GetLinearVelocity();
+    const ang = normalizeAngle(bottleBody.GetAngle());
+    const av = bottleBody.GetAngularVelocity();
+    const cfg = BOTTLES[bottleKey];
+
+    // Collision audio (vertical desk thump, side-wall bounce, & corner clatter)
+    const dvX = Math.abs(vel.x - prevVelX);
+    const dvY = Math.max(0, vel.y - prevVelY);
+    const dOm = Math.abs(av - prevOmega);
+    if (performance.now() - throwTime > 45) {
+      const impact = Math.hypot(dvX > 1.2 ? dvX : 0, dvY) + (dOm > 3.2 ? dOm * 0.22 : 0);
+      if (impact > 0.90) playThud(impact, cfg.isGlass);
+    }
+    prevVelX = vel.x; prevVelY = vel.y; prevOmega = av;
+
+    // Camera follow
+    if (widgetMode) {
+      targetCamX = 0;
+      targetCamY = 1.46;
+    } else {
+      targetCamX = pos.x * 0.42;
+      targetCamY = Math.max(1.52, 1.15 + pos.y * 0.28);
+    }
+
+    // Track peak air clearance & post-touchdown edge wobble for precision/recovery bonuses!
+    const absA = Math.abs(ang);
+    const restingDist = Math.abs(Math.cos(absA)) * cfg.halfH + Math.abs(Math.sin(absA)) * cfg.halfW;
+    const heightOffDesk = pos.y - restingDist;
+    if (heightOffDesk > peakAirHeight) peakAirHeight = heightOffDesk;
+
+    if (state === 'flying' && (performance.now() - throwTime > 260)) {
+      const tiltFromVertical = Math.min(absA, Math.abs(absA - Math.PI));
+      if (heightOffDesk < 0.12 && peakAirHeight > 0.18) {
+        if (!touchedDown) {
+          touchedDown = true;
+          touchdownTilt = tiltFromVertical;
+        }
+        if (tiltFromVertical > maxWobbleTilt) maxWobbleTilt = tiltFromVertical;
+      }
+
+      const spd = Math.hypot(vel.x, vel.y);
+      // Generous slosh-tolerant settle threshold so internal SPH ripples NEVER block upright rewards!
+      if (heightOffDesk < 0.22 && spd < 0.78 && Math.abs(av) < 1.15) {
+        settleTimer += realDt;
+        if (settleTimer >= 0.24) evaluateLanding(pos, ang);
+      } else {
+        settleTimer = 0;
+      }
+    }
+  }
+
+  function evaluateLanding(pos, ang) {
+    state = 'ready';
+    const absAng = Math.abs(ang);
+    const isUpright = absAng < 0.28;
+    const isCapStand = Math.abs(absAng - Math.PI) < 0.30;
+
+    if (!isUpright && !isCapStand) {
+      streak = 0;
+      updateHudNumbers();
+      return;
+    }
+
+    // Check minimum valid rotation (started sideways/inverted needs >= 65°; started upright needs >= 180° + real air height!)
+    const startedNonUpright = Math.abs(startAngle) > 0.55;
+    const netSpin = Math.abs(cumulativeSpin);
+    const minReqSpin = startedNonUpright ? 1.05 : (isCapStand ? 2.3 : 4.2);
+    if ((netSpin < minReqSpin && totalAbsSpin < minReqSpin + 0.8) || peakAirHeight < 0.16) {
+      return;
+    }
+
+    // ==========================================================================
+    // Detailed Difficulty-Scaled Score Calculation!
+    // ==========================================================================
+    const cfg = BOTTLES[bottleKey];
+    const tags = [];
+
+    // 1. Base Posture Score
+    let basePts = 100;
+    if (isCapStand) {
+      basePts = 350;
+      tags.push({ text: '🙃 瓶盖倒立 350', cls: 'pink' });
+    } else if (startedNonUpright && netSpin < 3.6) {
+      basePts = 80;
+      tags.push({ text: '🔄 鲤鱼打挺 80', cls: '' });
+    } else {
+      tags.push({ text: '✨ 正立基础 100', cls: '' });
+    }
+
+    // 2. Multi-Rotation Exponential Multiplier
+    const halfTurns = Math.max(1, Math.round(netSpin / Math.PI));
+    const fullTurns = halfTurns / 2;
+    let spinMult = 1.0;
+    if (fullTurns >= 4.0) spinMult = 8.5;
+    else if (fullTurns >= 3.0) spinMult = 5.0;
+    else if (fullTurns >= 2.5) spinMult = 3.6;
+    else if (fullTurns >= 2.0) spinMult = 2.6;
+    else if (fullTurns >= 1.5) spinMult = 1.8;
+    if (spinMult > 1.0) {
+      tags.push({ text: `🌪️ ${fullTurns}周空翻 ×${spinMult}`, cls: 'gold' });
+    }
+
+    // 3. Water Level Difficulty Multiplier
+    const wDiff = getWaterDifficulty(waterPct);
+    if (wDiff.mult > 1.0) {
+      tags.push({ text: `💧 ${wDiff.label}`, cls: 'cyan' });
+    }
+
+    // 4. Bottle Type Multiplier
+    if (cfg.diffMult !== 1.0) {
+      tags.push({ text: `${cfg.name} ×${cfg.diffMult}`, cls: cfg.diffMult > 1 ? 'gold' : '' });
+    }
+
+    // 5. Target Coaster & Edge-Wobble / Dead-Center Precision Bonuses
+    let styleMult = 1.0;
+    if (Math.abs(pos.x) <= COASTER_HALF_W) {
+      styleMult *= 1.4;
+      tags.push({ text: '🎯 靶心杯垫 ×1.4', cls: 'gold' });
+    }
+    const degWobble = maxWobbleTilt * 180 / Math.PI;
+    const degTouch = touchdownTilt * 180 / Math.PI;
+    if (degWobble >= 11.0) {
+      styleMult *= 1.5;
+      tags.push({ text: `⚖️ 达摩摇晃救回(${degWobble.toFixed(0)}°) ×1.5`, cls: 'pink' });
+    } else if (degTouch <= 3.2) {
+      styleMult *= 1.3;
+      tags.push({ text: '⚡ 垂直零晃动 ×1.3', cls: 'cyan' });
+    }
+
+    // 6. Streak Multiplier
+    streak += isCapStand ? 2 : 1;
+    if (streak > bestStreak) { bestStreak = streak; Store.set('bf_best_streak', bestStreak); }
+    if (isCapStand) { capCount++; Store.set('bf_cap_count', capCount); }
+    const comboMult = Math.min(3.0, +(1.0 + (streak - 1) * 0.2).toFixed(1));
+    if (comboMult > 1.0) {
+      tags.push({ text: `🔥 ${streak}连击 ×${comboMult}`, cls: 'gold' });
+    }
+
+    const earned = Math.max(10, Math.round(basePts * spinMult * wDiff.mult * cfg.diffMult * styleMult * comboMult));
+    totalScore += earned;
+    if (earned > bestShot) { bestShot = earned; Store.set('bf_best_shot', bestShot); }
+    Store.set('bf_total_score', totalScore);
+
+    const isEpic = earned >= 450 || isCapStand || fullTurns >= 2.0;
+    playWin(isEpic);
+    spawnConfetti(pos.x, pos.y + 0.6, isEpic ? 95 : 46);
+
+    const headline = isCapStand
+      ? '🙃 SSS 瓶盖倒立绝杀！！'
+      : (fullTurns >= 3 ? `👑 ${fullTurns}周神级空翻！！`
+      : (fullTurns >= 2 ? `🔥 ${fullTurns}周空翻完美立住！`
+      : (degWobble >= 11 ? '⚖️ 悬崖勒马！摇晃立稳！' : '✨ 稳稳立住！')));
+    showScoreBanner(earned, headline, tags, isCapStand ? '#f472b6' : (earned >= 500 ? '#5eead4' : '#ffd166'));
+    updateHudNumbers();
+  }
+
+  // ============================================================================
+  // 6. Polished Studio Desk Renderer + 5 Real-Time Shader Skins (Mac / ASCII / GB / CRT)
+  // ============================================================================
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const liqCanvas = document.createElement('canvas');
+  const liqCtx = liqCanvas.getContext('2d', { willReadFrequently: true });
+  const fxCanvas = document.createElement('canvas');
+  const fxCtx = fxCanvas.getContext('2d', { willReadFrequently: true });
+
+  const blobStamp = document.createElement('canvas');
+  blobStamp.width = blobStamp.height = 48;
+  (() => {
+    const sc = blobStamp.getContext('2d');
+    const g = sc.createRadialGradient(24, 24, 0, 24, 24, 24);
+    g.addColorStop(0, 'rgba(255,255,255,0.92)');
+    g.addColorStop(0.54, 'rgba(255,255,255,0.46)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    sc.fillStyle = g;
+    sc.fillRect(0, 0, 48, 48);
+  })();
+
+  let lutKey = '';
+  const colR = new Uint8Array(128), colG = new Uint8Array(128), colB = new Uint8Array(128), colA = new Uint8Array(128);
+  let W = 1280, H = 720, ppm = 108, dpr = 1;
+
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ppm = Math.min(W, H) * 0.158;
+  }
+  window.addEventListener('resize', () => { resize(); if (world) rebuildWorld(); });
+  resize();
+
+  function w2s(wx, wy) {
+    const scale = ppm * camZoom;
+    return {
+      x: W * 0.5 + (wx - camX) * scale,
+      y: H * 0.57 - (wy - camY) * scale
+    };
+  }
+
+  function drawBackground(nowSec) {
+    if (transparentBg && !xrayMode && skinMode === 'studio') {
+      ctx.clearRect(0, 0, W, H);
+      return;
+    }
+    if (xrayMode) {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0b1120');
+      grad.addColorStop(1, '#17253b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.strokeStyle = 'rgba(94, 234, 212, 0.08)';
+      ctx.lineWidth = 1;
+      for (let x = -12; x <= 12; x++) {
+        const sx = w2s(x, 0).x;
+        ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
+      }
+      for (let y = -4; y <= 10; y++) {
+        const sy = w2s(0, y).y;
+        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+      }
+      return;
+    }
+
+    // Warm sunlit study room backdrop
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#f7f1e6');
+    grad.addColorStop(0.58, '#ece2d2');
+    grad.addColorStop(1, '#ddd0bc');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    if (!widgetMode) {
+      ctx.save();
+      // Subtle architectural wall wainscot & soft background shelf/frame silhouettes
+      const dadoY = w2s(0, 2.55).y;
+      ctx.fillStyle = 'rgba(186, 168, 144, 0.13)';
+      ctx.fillRect(0, dadoY, W, Math.max(0, H - dadoY));
+      ctx.strokeStyle = 'rgba(155, 136, 112, 0.22)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, dadoY); ctx.lineTo(W, dadoY); ctx.stroke();
+
+      // Framed minimalist art print silhouette on left wall
+      const frameX = W * 0.16, frameY = Math.max(68, dadoY - 175);
+      if (W > 760) {
+        ctx.fillStyle = 'rgba(255, 252, 246, 0.55)';
+        ctx.strokeStyle = 'rgba(145, 122, 96, 0.28)';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.roundRect(frameX, frameY, 108, 136, 4); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = 'rgba(214, 162, 118, 0.26)';
+        ctx.beginPath(); ctx.arc(frameX + 54, frameY + 56, 26, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(128, 148, 132, 0.25)';
+        ctx.beginPath(); ctx.moveTo(frameX + 16, frameY + 116); ctx.lineTo(frameX + 48, frameY + 78); ctx.lineTo(frameX + 92, frameY + 116); ctx.closePath(); ctx.fill();
+      }
+
+      // Venetian window-blind sunlight stripes + floating warm dust motes
+      const beam = ctx.createLinearGradient(W * 0.08, 0, W * 0.72, H * 0.85);
+      beam.addColorStop(0, 'rgba(255, 252, 238, 0.58)');
+      beam.addColorStop(1, 'rgba(255, 248, 225, 0.0)');
+      ctx.fillStyle = beam;
+      for (let b = 0; b < 4; b++) {
+        const x0 = W * (0.06 + b * 0.095);
+        ctx.beginPath();
+        ctx.moveTo(x0, 0); ctx.lineTo(x0 + W * 0.055, 0);
+        ctx.lineTo(x0 + W * 0.34, H); ctx.lineTo(x0 + W * 0.26, H);
+        ctx.closePath(); ctx.fill();
+      }
+
+      ctx.fillStyle = 'rgba(255, 250, 230, 0.55)';
+      for (const m of dustMotes) {
+        const mx = ((m.x + nowSec * m.sp * 0.25) % 1) * W * 0.75 + W * 0.05;
+        const my = ((m.y - nowSec * m.sp * 0.5 + 10) % 1) * (H * 0.65);
+        ctx.beginPath(); ctx.arc(mx, my, m.r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawDeskAndCoaster() {
+    const scale = ppm * camZoom;
+    const tl = w2s(-(deskHalfW + 0.6), 0);
+    const pw = (deskHalfW + 0.6) * 2 * scale;
+    const ph = 1.15 * scale;
+
+    // 2.5D perspective rear tabletop depth strip (behind y=0 contact line!)
+    const backDepth = Math.max(14, scale * 0.22);
+    const surfaceGrad = ctx.createLinearGradient(0, tl.y - backDepth, 0, tl.y + 8);
+    surfaceGrad.addColorStop(0, xrayMode ? '#1e293b' : '#c48b5a');
+    surfaceGrad.addColorStop(1, xrayMode ? '#334155' : '#dfa878');
+    ctx.fillStyle = surfaceGrad;
+    ctx.beginPath();
+    ctx.roundRect(tl.x, tl.y - backDepth * 0.65, pw, backDepth + 8, [8, 8, 0, 0]);
+    ctx.fill();
+
+    // Front oak desk apron fascia
+    const bodyGrad = ctx.createLinearGradient(0, tl.y, 0, tl.y + ph);
+    bodyGrad.addColorStop(0, xrayMode ? '#1e293b' : '#8c5630');
+    bodyGrad.addColorStop(0.22, xrayMode ? '#0f172a' : '#734424');
+    bodyGrad.addColorStop(1, xrayMode ? '#090d16' : '#4e2d16');
+    ctx.fillStyle = bodyGrad;
+    ctx.fillRect(tl.x, tl.y + 6, pw, ph);
+
+    // Chamfered sunlit oak front lip + subtle wood grain lines
+    ctx.fillStyle = xrayMode ? '#475569' : '#eab688';
+    ctx.fillRect(tl.x, tl.y, pw, 7);
+    if (!xrayMode) {
+      ctx.strokeStyle = 'rgba(92, 50, 22, 0.16)';
+      ctx.lineWidth = 1.2;
+      for (let g = 1; g <= 3; g++) {
+        const gy = tl.y + 12 + g * 16;
+        ctx.beginPath(); ctx.moveTo(tl.x, gy); ctx.lineTo(tl.x + pw, gy); ctx.stroke();
+      }
+    }
+
+    // Center Target Cork Coaster ("🎯 靶心杯垫 ×1.4") right at x = 0!
+    const cPos = w2s(0, 0);
+    const cRx = COASTER_HALF_W * scale;
+    const cRy = Math.max(5.5, scale * 0.085);
+    ctx.save();
+    ctx.fillStyle = xrayMode ? 'rgba(56, 189, 248, 0.22)' : '#b57445';
+    ctx.beginPath();
+    ctx.ellipse(cPos.x, cPos.y + 1, cRx, cRy + 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.28)' : '#e6be94';
+    ctx.strokeStyle = xrayMode ? '#5eead4' : '#8c522b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.96, cRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Inner stitched bullseye ring on coaster
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = xrayMode ? 'rgba(255, 209, 102, 0.8)' : 'rgba(138, 75, 34, 0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.62, cRy * 0.62, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    if (!widgetMode) {
+      ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.75)' : 'rgba(255, 240, 220, 0.62)';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🎯 靶心软木垫 (立中 ×1.4)', cPos.x, tl.y + 26);
+    }
+  }
+
+  function traceInnerClip(c, spr, hwPx, hhPx) {
+    c.beginPath();
+    if (spr && spr.clip && spr.clip.length > 2) {
+      const pts = spr.clip;
+      c.moveTo(pts[0][0] * hwPx, pts[0][1] * hhPx);
+      for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0] * hwPx, pts[i][1] * hhPx);
+      c.closePath();
+    } else {
+      c.roundRect(-hwPx * 0.9, -hhPx * 0.85, hwPx * 1.8, hhPx * 1.82, 8);
+    }
+  }
+
+  function drawBottleAndFluid() {
+    if (!bottleBody || !particleSystem) return;
+    const cfg = BOTTLES[bottleKey];
+    const spr = spriteCache[bottleKey];
+    const scale = ppm * camZoom;
+    const rx = prevRenderX + (currRenderX - prevRenderX) * renderAlpha;
+    const ry = prevRenderY + (currRenderY - prevRenderY) * renderAlpha;
+    const ang = prevRenderAng + (currRenderAng - prevRenderAng) * renderAlpha;
+    const rawPos = bottleBody.GetPosition();
+    const scr = w2s(rx, ry);
+    const hwPx = cfg.halfW * scale;
+    const hhPx = cfg.halfH * scale;
+    const drawW = hwPx * 2.035;
+    const drawH = hhPx * 2.018;
+
+    // 1. Dynamic contact shadow on oak desk
+    const absA = Math.abs(normalizeAngle(ang));
+    const restDist = Math.abs(Math.cos(absA)) * cfg.halfH + Math.abs(Math.sin(absA)) * cfg.halfW;
+    const hAbove = Math.max(0, ry - restDist);
+    const shPos = w2s(rx, 0);
+    const shadowSpan = Math.abs(Math.cos(absA)) * hwPx + Math.abs(Math.sin(absA)) * hhPx * 0.85;
+    const rad = shadowSpan * Math.max(0.35, 1.06 - hAbove * 0.12);
+    const shGrad = ctx.createRadialGradient(shPos.x, shPos.y + 2, rad * 0.1, shPos.x, shPos.y + 2, rad * 1.15);
+    const peakAlpha = Math.max(0.06, 0.40 - hAbove * 0.06);
+    shGrad.addColorStop(0, `rgba(32, 18, 8, ${peakAlpha})`);
+    shGrad.addColorStop(1, 'rgba(32, 18, 8, 0)');
+    ctx.fillStyle = shGrad;
+    ctx.beginPath();
+    ctx.ellipse(shPos.x, shPos.y + 2, rad * 1.15, Math.max(4.5, rad * 0.22), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Back PET/Glass Layer
+    ctx.save();
+    ctx.translate(scr.x, scr.y);
+    ctx.rotate(-ang);
+    if (spr && spr.backImg) ctx.drawImage(spr.backImg, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+    ctx.restore();
+
+    // 3. LUT Metaball SPH Fluid Layer
+    const pBuf = particleSystem.GetPositionBuffer();
+    const pCount = pBuf.length / 2;
+    let sumX = 0, sumY = 0;
+
+    ctx.save();
+    ctx.translate(scr.x, scr.y);
+    ctx.rotate(-ang);
+    traceInnerClip(ctx, spr, hwPx, hhPx);
+    ctx.clip();
+    ctx.rotate(ang);
+    ctx.translate(-scr.x, -scr.y);
+
+    const [cr, cg, cb] = cfg.centerColor;
+    const [er, eg, eb] = cfg.edgeColor;
+    const [rr, rg, rb] = cfg.rimColor;
+    if (xrayMode) {
+      for (let i = 0; i < pBuf.length; i += 2) {
+        const px = pBuf[i], py = pBuf[i + 1];
+        sumX += px; sumY += py;
+        const ps = w2s(px, py);
+        ctx.fillStyle = bottleKey === 'cola' ? 'rgba(245, 158, 11, 0.92)' : `rgba(${er}, ${eg}, ${eb}, 0.95)`;
+        ctx.beginPath();
+        ctx.arc(ps.x, ps.y, Math.max(2.2, 0.031 * scale), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (pCount > 0) {
+      const padM = 1.12;
+      const lw = 80;
+      const lh = Math.max(136, Math.round(lw * (cfg.halfH / cfg.halfW)));
+      if (liqCanvas.width !== lw || liqCanvas.height !== lh) { liqCanvas.width = lw; liqCanvas.height = lh; lutKey = ''; }
+      liqCtx.clearRect(0, 0, lw, lh);
+
+      const rawAng = bottleBody.GetAngle();
+      const cosA = Math.cos(rawAng), sinA = Math.sin(rawAng);
+      const mScale = (lw * 0.5) / (cfg.halfW * padM);
+      const blobR = Math.max(7.0, 0.116 * mScale);
+      const blobD = blobR * 2;
+
+      if (lutKey !== bottleKey) {
+        lutKey = bottleKey;
+        const halfLw = lw * 0.5;
+        const invSpan = 1.0 / (cfg.halfW * 0.95 * mScale);
+        for (let px = 0; px < lw; px++) {
+          const radNorm = Math.min(1.0, Math.abs(px - halfLw) * invSpan);
+          const cyl = Math.pow(radNorm, 1.55);
+          const caustic = Math.max(0, 1.0 - Math.abs(radNorm - 0.28) * 4.0) * 0.16;
+          colR[px] = Math.min(255, Math.round(cr * (1 - cyl) + er * cyl + caustic * 60));
+          colG[px] = Math.min(255, Math.round(cg * (1 - cyl) + eg * cyl + caustic * 65));
+          colB[px] = Math.min(255, Math.round(cb * (1 - cyl) + eb * cyl + caustic * 70));
+          colA[px] = Math.round(cfg.centerAlpha * (1 - cyl) + cfg.edgeAlpha * cyl);
+        }
+      }
+
+      for (let i = 0; i < pBuf.length; i += 2) {
+        const px = pBuf[i], py = pBuf[i + 1];
+        sumX += px; sumY += py;
+        const dx = px - rawPos.x, dy = py - rawPos.y;
+        const lx =  dx * cosA + dy * sinA;
+        const ly = -dx * sinA + dy * cosA;
+        const sx = lw * 0.5 + lx * mScale;
+        const sy = lh * 0.5 - ly * mScale;
+        liqCtx.drawImage(blobStamp, sx - blobR, sy - blobR, blobD, blobD);
+      }
+
+      const img = liqCtx.getImageData(0, 0, lw, lh);
+      const d = img.data;
+      const halfLw = lw >> 1;
+      const halfLh = lh >> 1;
+      const wallPxX = (cfg.halfW * 0.81 * mScale) | 0;
+      const wallPxY = (cfg.halfH * 0.87 * mScale) | 0;
+      const rimA = cfg.rimAlpha;
+
+      for (let py = 0; py < lh; py++) {
+        const rowOff = py * lw * 4;
+        const dyAbs = py > halfLh ? py - halfLh : halfLh - py;
+        const nearCapOrBase = dyAbs > wallPxY;
+        for (let px = 0; px < lw; px++) {
+          const k = rowOff + (px << 2);
+          const a = d[k + 3];
+          if (a < 68) { d[k + 3] = 0; continue; }
+          const dxAbs = px > halfLw ? px - halfLw : halfLw - px;
+          if (a < 112 && dxAbs < wallPxX && !nearCapOrBase) {
+            d[k] = rr; d[k + 1] = rg; d[k + 2] = rb;
+            d[k + 3] = (rimA * (140 + ((a - 68) * 115 >> 6))) >> 8;
+          } else {
+            d[k] = colR[px]; d[k + 1] = colG[px]; d[k + 2] = colB[px];
+            d[k + 3] = a < 94 ? (colA[px] * (195 + ((a - 68) << 1))) >> 8 : colA[px];
+          }
+        }
+      }
+      liqCtx.putImageData(img, 0, 0);
+
+      ctx.save();
+      ctx.translate(scr.x, scr.y);
+      ctx.rotate(-ang);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(liqCanvas, -hwPx * padM, -hhPx * padM, hwPx * padM * 2, hhPx * padM * 2);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 4. Front Opaque Cap + Label + PET Rib Specular Layer
+    ctx.save();
+    ctx.translate(scr.x, scr.y);
+    ctx.rotate(-ang);
+    if (xrayMode) ctx.globalAlpha = 0.36;
+    if (spr && spr.frontImg) ctx.drawImage(spr.frontImg, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+    if (xrayMode) {
+      ctx.globalAlpha = 1.0;
+      traceInnerClip(ctx, spr, hwPx, hhPx);
+      ctx.strokeStyle = 'rgba(94, 234, 212, 0.72)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 5. X-Ray Telemetry Overlay
+    if (xrayMode) {
+      const mBottle = bottleBody.GetMass();
+      const mWater = pCount * (0.78 * 0.062 * 0.062);
+      const cmX = pCount > 0 ? (rawPos.x * mBottle + (sumX / pCount) * mWater) / (mBottle + mWater) : rawPos.x;
+      const cmY = pCount > 0 ? (rawPos.y * mBottle + (sumY / pCount) * mWater) / (mBottle + mWater) : rawPos.y;
+      const cmScr = w2s(cmX, cmY);
+
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cmScr.x, cmScr.y, 7, 0, Math.PI * 2);
+      ctx.moveTo(cmScr.x - 11, cmScr.y); ctx.lineTo(cmScr.x + 11, cmScr.y);
+      ctx.moveTo(cmScr.x, cmScr.y - 11); ctx.lineTo(cmScr.x, cmScr.y + 11);
+      ctx.stroke();
+      ctx.fillStyle = '#ffd166'; ctx.font = 'bold 11px monospace';
+      ctx.fillText('CM', cmScr.x + 14, cmScr.y - 6);
+
+      const deg = (normalizeAngle(ang) * 180 / Math.PI).toFixed(1);
+      const offsetCm = (Math.hypot(cmX - rawPos.x, cmY - rawPos.y) * 100).toFixed(1);
+      document.getElementById('ph-particles').textContent = `SPH 水粒子: ${pCount} 颗`;
+      document.getElementById('ph-omega').textContent = `角速度 ω: ${bottleBody.GetAngularVelocity().toFixed(2)} rad/s`;
+      document.getElementById('ph-angle').textContent = `倾角 θ: ${deg}°`;
+      document.getElementById('ph-cm').textContent = `动态质心偏移: ${offsetCm} cm`;
+    }
+  }
+
+  // ============================================================================
+  // 7. Live Retro Shader Skins (Macintosh 1984 1-Bit / ASCII Art / GameBoy / CRT)
+  // ============================================================================
+  const BAYER4 = [
+     0, 128,  32, 160,
+   192,  64, 224,  96,
+    48, 176,  16, 144,
+   240, 112, 208,  80
+  ];
+  const ASCII_RAMP = ' .:-=+*#%@';
+
+  function applySkinPostProcess() {
+    if (skinMode === 'studio' || xrayMode) return;
+
+    if (skinMode === 'mac') {
+      // 1984 Apple Macintosh 1-Bit Ordered Bayer Dithering + Classic System 1 Window Chrome!
+      const pxSize = 2;
+      const sw = Math.max(64, Math.floor(W / pxSize));
+      const sh = Math.max(64, Math.floor(H / pxSize));
+      if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
+      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
+      const img = fxCtx.getImageData(0, 0, sw, sh);
+      const d = img.data;
+      for (let y = 0; y < sh; y++) {
+        const by = (y & 3) << 2;
+        const row = y * sw * 4;
+        for (let x = 0; x < sw; x++) {
+          const i = row + (x << 2);
+          // Contrast-boosted luminance so bottle labels, edges & water ripples pop in crisp 1-bit!
+          const lum = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+          const boosted = Math.max(0, Math.min(255, ((lum - 148) * 1.55 + 142) | 0));
+          const white = boosted > BAYER4[by + (x & 3)];
+          d[i]     = white ? 245 : 22;
+          d[i + 1] = white ? 244 : 22;
+          d[i + 2] = white ? 238 : 25;
+          d[i + 3] = 255;
+        }
+      }
+      fxCtx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(fxCanvas, 0, 0, W, H);
+
+      // Authentic 1984 Mac System 1 Pinstripe Window Frame
+      if (!widgetMode) {
+        ctx.strokeStyle = '#161619';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(4, 4, W - 8, H - 8);
+        ctx.fillStyle = '#f5f4ee';
+        ctx.fillRect(5, 5, W - 10, 22);
+        ctx.strokeRect(4, 4, W - 8, 23);
+        for (let py = 8; py <= 22; py += 3) {
+          ctx.beginPath(); ctx.moveTo(10, py); ctx.lineTo(W - 10, py); ctx.stroke();
+        }
+        const titleW = 220;
+        ctx.fillStyle = '#f5f4ee';
+        ctx.fillRect((W - titleW) * 0.5, 6, titleW, 19);
+        ctx.fillStyle = '#161619';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Macintosh BottleFlip 1984', W * 0.5, 20);
+      }
+      ctx.restore();
+    } else if (skinMode === 'gb') {
+      // 1989 Nintendo Game Boy DMG-01 4-Shade Olive Pixel Matrix!
+      const pxSize = 3;
+      const sw = Math.max(64, Math.floor(W / pxSize));
+      const sh = Math.max(64, Math.floor(H / pxSize));
+      if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
+      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
+      const img = fxCtx.getImageData(0, 0, sw, sh);
+      const d = img.data;
+      const pal = [
+        [15, 56, 15],
+        [48, 98, 48],
+        [139, 172, 15],
+        [155, 188, 15]
+      ];
+      for (let y = 0; y < sh; y++) {
+        const by = (y & 3) << 2;
+        const row = y * sw * 4;
+        for (let x = 0; x < sw; x++) {
+          const i = row + (x << 2);
+          const lum = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+          const dither = (BAYER4[by + (x & 3)] - 128) >> 3;
+          const idx = Math.max(0, Math.min(3, ((lum + dither) * 4) >> 8));
+          const c = pal[idx];
+          d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+        }
+      }
+      fxCtx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(fxCanvas, 0, 0, W, H);
+      ctx.restore();
+    } else if (skinMode === 'ascii') {
+      // Real-Time Glowing Phosphor Terminal ASCII Art Rasterizer!
+      const cellW = 7, cellH = 12;
+      const cols = Math.max(32, Math.floor(W / cellW));
+      const rows = Math.max(20, Math.floor(H / cellH));
+      if (fxCanvas.width !== cols || fxCanvas.height !== rows) { fxCanvas.width = cols; fxCanvas.height = rows; }
+      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cols, rows);
+      const d = fxCtx.getImageData(0, 0, cols, rows).data;
+
+      ctx.save();
+      ctx.fillStyle = '#070b10';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = 'bold 11px Consolas, "Courier New", monospace';
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';
+
+      // Batch green characters vs cyan water/red label accents for fast crisp rendering!
+      let greenLines = new Array(rows).fill('');
+      const accents = [];
+      for (let r = 0; r < rows; r++) {
+        let line = '';
+        const off = r * cols * 4;
+        for (let c = 0; c < cols; c++) {
+          const i = off + (c << 2);
+          const R = d[i], G = d[i + 1], B = d[i + 2];
+          // Measure contrast from bright beige background (~234,224,208) so bottle & desk stand out vividly!
+          const diffBg = Math.abs(R - 234) + Math.abs(G - 224) + Math.abs(B - 208);
+          if (diffBg < 36) {
+            line += (r + c) % 11 === 0 ? '·' : ' ';
+            continue;
+          }
+          const intensity = Math.min(9, Math.max(1, (diffBg / 42) | 0));
+          const ch = ASCII_RAMP[intensity];
+          if (B > R + 28) {
+            line += ' ';
+            accents.push({ x: c * cellW, y: r * cellH, ch, col: '#38bdf8' }); // Blue water
+          } else if (R > G + 45) {
+            line += ' ';
+            accents.push({ x: c * cellW, y: r * cellH, ch, col: '#fb7185' }); // Red cap/label
+          } else {
+            line += ch;
+          }
+        }
+        greenLines[r] = line;
+      }
+      ctx.fillStyle = '#34d399';
+      for (let r = 0; r < rows; r++) {
+        ctx.fillText(greenLines[r], 0, r * cellH);
+      }
+      for (let k = 0; k < accents.length; k++) {
+        const a = accents[k];
+        ctx.fillStyle = a.col;
+        ctx.fillText(a.ch, a.x, a.y);
+      }
+      ctx.restore();
+    } else if (skinMode === 'crt') {
+      // Synthwave Neon Edge-Glow CRT Scanline Mode!
+      const sw = Math.max(80, Math.floor(W / 2));
+      const sh = Math.max(80, Math.floor(H / 2));
+      if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
+      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
+      const img = fxCtx.getImageData(0, 0, sw, sh);
+      const d = img.data;
+      for (let y = 0; y < sh; y++) {
+        const scan = (y & 1) ? 0.76 : 1.0;
+        const row = y * sw * 4;
+        for (let x = 0; x < sw; x++) {
+          const i = row + (x << 2);
+          const R = d[i], G = d[i + 1], B = d[i + 2];
+          const diffBg = Math.abs(R - 234) + Math.abs(G - 224) + Math.abs(B - 208);
+          if (diffBg < 34) {
+            // Deep cyber purple-navy grid background
+            const grid = (x % 24 === 0 || y % 24 === 0) ? 18 : 0;
+            d[i] = (14 + grid) * scan; d[i + 1] = (10 + grid) * scan; d[i + 2] = (34 + grid * 2) * scan;
+          } else {
+            // Boost neon chroma on bottle, label & water!
+            d[i]     = Math.min(255, (R * 1.15 + 18) * scan);
+            d[i + 1] = Math.min(255, (G * 1.08 + 10) * scan);
+            d[i + 2] = Math.min(255, (B * 1.28 + 38) * scan);
+          }
+        }
+      }
+      fxCtx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(fxCanvas, 0, 0, W, H);
+      ctx.restore();
+    }
+  }
+
+  function drawAimPreview() {
+    if ((!dragging && !spaceCharging) || !canGrabBottle()) return;
+    let th;
+    if (dragging) {
+      th = computeThrowFromDrag();
+      if (!th.valid) return;
+    } else {
+      const p = Math.min(1, spaceChargeT / 0.85);
+      th = { vx: 0.04 * (4 + p * 8), vy: 5.8 + p * 9.4, power: p };
+    }
+
+    const pos = bottleBody.GetPosition();
+    ctx.save();
+    for (let i = 1; i <= 11; i++) {
+      const t = i * 0.052;
+      const wx = pos.x + th.vx * t;
+      const wy = pos.y + th.vy * t - 0.5 * 16.8 * t * t;
+      const sp = w2s(wx, wy);
+      const alpha = 0.92 - i * 0.068;
+      const rad = Math.max(3.0, 6.4 - i * 0.34);
+      ctx.fillStyle = skinMode === 'mac' ? '#161619' : `rgba(245, 158, 11, ${alpha})`;
+      ctx.strokeStyle = skinMode === 'mac' ? '#ffffff' : `rgba(15, 23, 42, ${alpha * 0.55})`;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, rad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    const bScr = w2s(pos.x, pos.y);
+    const bw = 64, bh = 8;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.76)';
+    ctx.fillRect(bScr.x - bw / 2, bScr.y + 68, bw, bh);
+    ctx.fillStyle = th.power > 0.82 ? '#ef4444' : '#f59e0b';
+    ctx.fillRect(bScr.x - bw / 2, bScr.y + 68, bw * th.power, bh);
+    ctx.restore();
+  }
+
+  function drawConfetti(dt) {
+    for (let i = confetti.length - 1; i >= 0; i--) {
+      const p = confetti[i];
+      p.life -= dt;
+      if (p.life <= 0) { confetti.splice(i, 1); continue; }
+      p.vy -= 12 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+      const sp = w2s(p.x, p.y);
+      ctx.save();
+      ctx.translate(sp.x, sp.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = Math.min(1, p.life);
+      ctx.fillStyle = skinMode === 'mac' ? '#161619' : p.c;
+      ctx.fillRect(-p.sz / 2, -p.sz / 2, p.sz, p.sz * 0.65);
+      ctx.restore();
+    }
+  }
+
+  // ============================================================================
+  // 8. Input, Skin Switcher, Rules Modal & Native Widget Bridge
+  // ============================================================================
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!canGrabBottle()) return;
+    ensureAudio();
+    dragging = true;
+    dragStart = { x: e.clientX, y: e.clientY };
+    dragCur = { x: e.clientX, y: e.clientY };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    dragCur = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    const th = computeThrowFromDrag();
+    if (th.valid) launchBottle(th.vx, th.vy, th.omega, th.power);
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && canGrabBottle() && !spaceCharging) {
+      e.preventDefault();
+      spaceCharging = true; spaceChargeT = 0;
+    } else if (e.code === 'KeyR') {
+      rebuildWorld();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space' && spaceCharging) {
+      e.preventDefault();
+      spaceCharging = false;
+      const p = Math.min(1, spaceChargeT / 0.85);
+      launchBottle(0.04 * (4 + p * 8), 5.8 + p * 9.4, -(3.2 + p * 7.4), p);
+    }
+  });
+
+  const slider = document.getElementById('water-slider');
+  function syncWaterBadge() {
+    const wd = getWaterDifficulty(waterPct);
+    document.getElementById('water-val').textContent = waterPct + '%';
+    const hint = document.getElementById('water-hint');
+    hint.textContent = wd.hint;
+    hint.style.color = wd.col;
+  }
+  slider.addEventListener('input', () => {
+    waterPct = parseInt(slider.value, 10);
+    syncWaterBadge();
+    rebuildWorld();
+  });
+  syncWaterBadge();
+
+  document.getElementById('bottle-tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.b-btn'); if (!btn) return;
+    bottleKey = btn.dataset.type;
+    document.querySelectorAll('.b-btn').forEach(x => x.classList.toggle('active', x === btn));
+    rebuildWorld();
+  });
+
+  function setSkin(sk) {
+    skinMode = sk;
+    Store.set('bf_skin', sk);
+    document.querySelectorAll('.skin-btn').forEach(b => b.classList.toggle('active', b.dataset.skin === sk));
+    renderOnce();
+  }
+  document.getElementById('skin-bar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.skin-btn'); if (!btn) return;
+    setSkin(btn.dataset.skin);
+  });
+  setSkin(skinMode);
+
+  // Rules modal
+  const rulesModal = document.getElementById('rules-modal');
+  document.getElementById('btn-rules').addEventListener('click', () => rulesModal.classList.add('show'));
+  document.getElementById('rules-close').addEventListener('click', () => rulesModal.classList.remove('show'));
+  rulesModal.addEventListener('click', (e) => { if (e.target === rulesModal) rulesModal.classList.remove('show'); });
+
+  document.getElementById('btn-xray').addEventListener('click', (e) => {
+    xrayMode = !xrayMode;
+    e.currentTarget.classList.toggle('active', xrayMode);
+    document.getElementById('phys-hud').classList.toggle('show', xrayMode);
+    renderOnce();
+  });
+  document.getElementById('btn-sfx').addEventListener('click', (e) => {
+    sfxEnabled = !sfxEnabled;
+    e.currentTarget.textContent = sfxEnabled ? '🔊 音效开' : '🔇 音效关';
+    const wbSfx = document.getElementById('wb-sfx');
+    if (wbSfx) wbSfx.textContent = sfxEnabled ? '🔊' : '🔇';
+  });
+  document.getElementById('btn-reset').addEventListener('click', () => rebuildWorld());
+
+  // Native Desktop Widget Bridge
+  function postHost(msg) {
+    try { if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(msg); } catch (err) {}
+  }
+  document.getElementById('btn-widget-toggle').addEventListener('click', () => {
+    widgetMode = !widgetMode;
+    document.body.classList.toggle('widget-mode', widgetMode);
+    rebuildWorld();
+  });
+  document.getElementById('wb-drag').addEventListener('pointerdown', (e) => {
+    if (e.button === 0) postHost('drag');
+  });
+  document.getElementById('wb-skin').addEventListener('click', () => {
+    const next = SKINS[(SKINS.indexOf(skinMode) + 1) % SKINS.length];
+    setSkin(next);
+  });
+  document.getElementById('wb-bg').addEventListener('click', (e) => {
+    if (skinMode !== 'studio') setSkin('studio');
+    transparentBg = !transparentBg;
+    document.documentElement.classList.toggle('transparent-bg', transparentBg);
+    e.currentTarget.classList.toggle('active', transparentBg);
+    renderOnce();
+  });
+  if (transparentBg) document.getElementById('wb-bg').classList.add('active');
+  document.getElementById('wb-pin').addEventListener('click', (e) => {
+    const pinned = e.currentTarget.classList.toggle('active');
+    postHost(pinned ? 'pin:1' : 'pin:0');
+  });
+  document.getElementById('wb-sfx').addEventListener('click', (e) => {
+    sfxEnabled = !sfxEnabled;
+    e.currentTarget.textContent = sfxEnabled ? '🔊' : '🔇';
+    document.getElementById('btn-sfx').textContent = sfxEnabled ? '🔊 音效开' : '🔇 音效关';
+  });
+  document.getElementById('wb-min').addEventListener('click', () => {
+    if (window.chrome && window.chrome.webview) postHost('hide');
+    else { widgetMode = false; document.body.classList.remove('widget-mode'); rebuildWorld(); }
+  });
+  document.getElementById('wb-close').addEventListener('click', () => {
+    if (window.chrome && window.chrome.webview) postHost('close');
+    else { widgetMode = false; transparentBg = false; document.body.classList.remove('widget-mode'); document.documentElement.classList.remove('transparent-bg'); rebuildWorld(); }
+  });
+
+  // ============================================================================
+  // 9. Main Loop
+  // ============================================================================
+  renderOnce = function(dt = 0) {
+    const nowSec = performance.now() * 0.001;
+    drawBackground(nowSec);
+    drawDeskAndCoaster();
+    drawBottleAndFluid();
+    applySkinPostProcess();
+    drawAimPreview();
+    drawConfetti(dt);
+  };
+
+  rebuildWorld();
+  let lastT = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+
+    if (spaceCharging) spaceChargeT += dt;
+    stepPhysics(dt);
+
+    const camK = 1.0 - Math.exp(-8.5 * dt);
+    camX += (targetCamX - camX) * camK;
+    camY += (targetCamY - camY) * camK;
+
+    renderOnce(dt);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

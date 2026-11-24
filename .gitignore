@@ -1,0 +1,6 @@
+__pycache__/
+*.pdb
+*.user
+.DS_Store
+Thumbs.db
+desktop-widget/lib/
