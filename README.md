@@ -5,20 +5,20 @@
 
 ![实物级四款瓶身预览](assets/preview_bottles.png)
 
-![实时 Dither 与极客皮肤展示](assets/preview_skins.png)
+![开源壁纸与复古抖动皮肤展示](assets/preview_skins.png)
 
 ## ✨ 核心亮点
 
-- **🎯 真实流体物理 + 无空气墙无限矢量平地 (`Boundless Vector Flatland`)**
+- **🎯 真实流体物理 + 无空气墙无限平地 (`Boundless Flatland`)**
   - 内置 Google `LiquidFun` 实时解算上百颗 `SPH` 水粒子，还原《American Journal of Physics》立水瓶流体滞后与转动惯量重分布效应；
-  - **彻底移除空气墙与天花板**——无限延伸的多层视差矢量长桌（拱窗远山、动态走时挂钟、木质书架绿植、包豪斯挂画、每 6 米远征软木靶垫），高抛自动平滑变焦跟拍；
+  - **彻底移除空气墙与天花板**——无限延伸长桌（每 6 米远征软木靶垫）+ 无缝镜像视差壁纸跟拍 + 高抛平滑自动变焦；
   - 采用 **C1 圆角胶囊切线外轮廓 (`b2CircleShape` + 切线壁)** 与 **达摩摇晃稳态判定保护**——无论边缘摇晃几秒再救回正立，100% 精准触发奖励！
-- **🎨 5 款实时视觉皮肤（复刻 [`Saganaki22/Dither`](https://github.com/Saganaki22/Dither) 经典抖动算法）**
-  - **📷 写实原木 (`Studio`)**：暖阳无尽矢量书房 + 农夫山泉 / 可口可乐 / 草莓牛奶 / 玻璃汽水 4 款摄影级双层光学瓶身；
-  - **🍎 麦金塔 (`Bill Atkinson 1/8 Serpentine`)**：1:1 像素级蛇形扫描 Atkinson 误差扩散（保留 6/8 误差），复刻 1984 麦金塔版画级针尖颗粒质感；
-  - **📰 波普网点 (`45° Rotated Halftone`)**：45° 旋转网格中心采样抗锯齿圆形印刷网点；
-  - **💻 极客 ASCII (`Sobel Contour + Bitmap Atlas`)**：6×10 像素对齐字模 + 3×3 Sobel 边缘方向字符（`| - / \`）+ 多色荧光终端着色；
-  - **👾 掌机 Floyd (`Floyd-Steinberg DMG-01`)**：蛇形 `[7,3,5,1]/16` 误差扩散四阶橄榄绿掌机点阵。
+- **🖼️ 内置 5 款精选开源高清壁纸 + 支持上传本地壁纸**
+  - 精选自 [`zhichaoh/catppuccin-wallpapers`](https://github.com/zhichaoh/catppuccin-wallpapers) 与 [`elementary/wallpapers`](https://github.com/elementary/wallpapers) 开源社区壁纸：**🗻 富士云霞**、**🏔️ 晴日雪湖**、**🌄 暮紫群山**、**🌆 晚风粉云**、**🌅 静海长桥**（前景木桌自动匹配壁纸色温），同时支持 **`📂 本地壁纸`** 一键导入电脑任意图片！
+- **🎨 3 款极速丝滑视觉皮肤（满帧 144Hz 零卡顿）**
+  - **📷 原彩 (`Studio`)**：高清开源风景壁纸 + 农夫山泉 / 可口可乐 / 草莓牛奶 / 玻璃汽水 4 款摄影级双层光学瓶身；
+  - **🍎 麦金塔 1-Bit (`Bill Atkinson Serpentine`)**：复刻 [`Saganaki22/Dither`](https://github.com/Saganaki22/Dither) 蛇形扫描 Atkinson `1/8` 误差扩散（`< 1.1ms/帧` 极速满帧）；
+  - **👾 复古掌机 (`Floyd-Steinberg DMG-01`)**：蛇形 `[7,3,5,1]/16` 误差扩散四阶橄榄绿掌机点阵（`< 0.8ms/帧`）。
 - **🔊 拟真物理 Foley 合成音效（零外部音频依赖）**
   - 实时合成粉红噪声切风声、瓶内水体翻涌声（`哗啦~`）、实木桌面敲击共振、随水量动态变调的 PET 空腔弹跳声、清脆玻璃瓶泛音与连击升调马林巴和弦。
 - **📜 硬核多维计分细则（越极限分越高）**

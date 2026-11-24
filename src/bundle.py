@@ -6,11 +6,15 @@ REPO = os.path.dirname(HERE)
 src = open(os.path.join(HERE, 'game_src.html'), encoding='utf-8').read()
 lf = open(os.path.join(HERE, 'lib', 'liquidfun.js'), encoding='utf-8').read()
 ba = open(os.path.join(HERE, 'lib', 'bottle_assets.js'), encoding='utf-8').read()
+wp_file = os.path.join(HERE, 'lib', 'wallpaper_assets.js')
+wp = open(wp_file, encoding='utf-8').read() if os.path.exists(wp_file) else ''
 
 lf_safe = lf.replace('</script>', '<\\/script>')
 ba_safe = ba.replace('</script>', '<\\/script>')
+wp_safe = wp.replace('</script>', '<\\/script>')
 
 out_html = src.replace('<!-- BOTTLE_ASSETS_PLACEHOLDER -->', f'<script>\n{ba_safe}\n</script>')
+out_html = out_html.replace('<!-- WALLPAPER_ASSETS_PLACEHOLDER -->', f'<script>\n{wp_safe}\n</script>')
 out_html = out_html.replace('<!-- LIQUIDFUN_INLINE_PLACEHOLDER -->', f'<script>\n{lf_safe}\n</script>')
 
 out_path = os.path.join(REPO, 'index.html')

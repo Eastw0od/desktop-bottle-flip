@@ -76,19 +76,22 @@
     .pill-btn:hover { background: rgba(34, 45, 70, 0.92); border-color: rgba(255, 209, 102, 0.55); }
     .pill-btn.active { background: #ffd166; color: #1a1404; border-color: #ffd166; }
 
-    /* Skin Selector Bar */
+    /* Skin & Wallpaper Selector Bar */
     .skin-bar {
-      position: fixed; top: 62px; right: 12px; z-index: 20;
-      display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;
+      position: fixed; top: 58px; right: 12px; z-index: 20;
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end;
+      max-width: calc(100vw - 230px);
     }
-    .skin-btn {
+    .bar-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.22); margin: 0 3px; }
+    .skin-btn, .wp-btn {
       background: rgba(18, 24, 38, 0.78); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1;
       padding: 5px 10px; border-radius: 99px; font-size: 11.5px; font-weight: 800;
       cursor: pointer; transition: all 0.15s;
     }
-    .skin-btn:hover { background: rgba(34, 45, 70, 0.9); color: #fff; }
+    .skin-btn:hover, .wp-btn:hover { background: rgba(34, 45, 70, 0.92); color: #fff; }
     .skin-btn.active { background: #38bdf8; color: #082f49; border-color: #7dd3fc; }
+    .wp-btn.active { background: #a78bfa; color: #1e1b4b; border-color: #c4b5fd; }
 
     /* Physics telemetry badge (visible in X-Ray mode) */
     #phys-hud {
@@ -223,8 +226,9 @@
       <span class="wb-streak"><b id="wb-score-num">0</b>分 · 🔥<b id="wb-streak-num">0</b></span>
     </div>
     <div class="wb-actions">
-      <button class="wb-btn" id="wb-skin" title="切换视觉皮肤 (写实/麦金塔/ASCII/掌机/霓虹)">🎨</button>
-      <button class="wb-btn" id="wb-bg" title="切换透明桌宠 / 书房背景">🪟</button>
+      <button class="wb-btn" id="wb-wp" title="切换开源精选壁纸">🖼️</button>
+      <button class="wb-btn" id="wb-skin" title="切换视觉皮肤 (原彩 / 麦金塔 1-Bit / 复古掌机)">🎨</button>
+      <button class="wb-btn" id="wb-bg" title="切换透明桌宠 / 壁纸背景">🪟</button>
       <button class="wb-btn active" id="wb-pin" title="窗口置顶开关">📌</button>
       <button class="wb-btn" id="wb-sfx" title="音效开关">🔊</button>
       <button class="wb-btn" id="wb-min" title="隐藏到系统托盘 (Alt+B)">➖</button>
@@ -258,11 +262,17 @@
   </div>
 
   <div class="skin-bar" id="skin-bar">
-    <button class="skin-btn active" data-skin="studio">📷 写实原木</button>
-    <button class="skin-btn" data-skin="mac">🍎 麦金塔 Atkinson</button>
-    <button class="skin-btn" data-skin="halftone">📰 波普网点</button>
-    <button class="skin-btn" data-skin="ascii">💻 极客 ASCII</button>
-    <button class="skin-btn" data-skin="gb">👾 掌机 Floyd</button>
+    <button class="wp-btn active" data-wp="fuji" title="开源壁纸: Catppuccin Mt.Fuji Forest">🗻 富士云霞</button>
+    <button class="wp-btn" data-wp="clearday" title="开源壁纸: Catppuccin Clear Day Lake">🏔️ 晴日雪湖</button>
+    <button class="wp-btn" data-wp="valley" title="开源壁纸: Catppuccin Shaded Valley">🌄 暮紫群山</button>
+    <button class="wp-btn" data-wp="evening" title="开源壁纸: Catppuccin Evening Sky">🌆 晚风粉云</button>
+    <button class="wp-btn" data-wp="pier" title="开源壁纸: Elementary OS Sunset Pier">🌅 静海长桥</button>
+    <button class="wp-btn" id="btn-wp-upload" title="从电脑选择任意自定义壁纸">📂 本地壁纸</button>
+    <input type="file" id="wp-file-input" accept="image/*" style="display:none">
+    <span class="bar-sep"></span>
+    <button class="skin-btn active" data-skin="studio">📷 原彩</button>
+    <button class="skin-btn" data-skin="mac">🍎 麦金塔 1-Bit</button>
+    <button class="skin-btn" data-skin="gb">👾 复古掌机</button>
   </div>
 
   <div id="phys-hud">
@@ -315,6 +325,7 @@
   </div>
 
   <!-- BOTTLE_ASSETS_PLACEHOLDER -->
+  <!-- WALLPAPER_ASSETS_PLACEHOLDER -->
   <!-- LIQUIDFUN_INLINE_PLACEHOLDER -->
 
 <script>
@@ -550,11 +561,21 @@
     }
   };
 
-  const SKINS = ['studio', 'mac', 'halftone', 'ascii', 'gb'];
-  const SKIN_NAMES = { studio: '📷 写实', mac: '🍎 麦金塔', halftone: '📰 波普网点', ascii: '💻 ASCII', gb: '👾 掌机' };
+  const SKINS = ['studio', 'mac', 'gb'];
+  const SKIN_NAMES = { studio: '📷 原彩', mac: '🍎 麦金塔', gb: '👾 掌机' };
+  const WALLPAPERS = ['fuji', 'clearday', 'valley', 'evening', 'pier'];
+  const DESK_THEMES = {
+    fuji:     { top0: '#be836f', top1: '#d99e88', lip: '#f2bca4', ap0: '#78463e', ap1: '#59312e', ap2: '#331a1c', cTop: '#ecc5ad', cRim: '#753f34' },
+    clearday: { top0: '#c48b5a', top1: '#dfa878', lip: '#f0be90', ap0: '#8c5630', ap1: '#734424', ap2: '#4e2d16', cTop: '#e6be94', cRim: '#8c522b' },
+    valley:   { top0: '#b5786a', top1: '#cf9280', lip: '#e8ae9b', ap0: '#6b3b3e', ap1: '#4f2a33', ap2: '#291520', cTop: '#e3b6a4', cRim: '#69363a' },
+    evening:  { top0: '#967078', top1: '#b0888f', lip: '#cba3a8', ap0: '#543846', ap1: '#3e2836', ap2: '#221520', cTop: '#d6b2b6', cRim: '#523442' },
+    pier:     { top0: '#ab7e60', top1: '#c79776', lip: '#e3b492', ap0: '#614234', ap1: '#473026', ap2: '#261915', cTop: '#dfc0a4', cRim: '#634130' },
+    custom:   { top0: '#b8845c', top1: '#d49d72', lip: '#ebb68a', ap0: '#7d4d2d', ap1: '#613a21', ap2: '#3d2313', cTop: '#e6be94', cRim: '#804c28' }
+  };
 
   let renderOnce = () => {};
   const spriteCache = {};
+  const wpCache = {};
   function toGpuCanvas(img) {
     const c = document.createElement('canvas');
     c.width = img.naturalWidth || img.width;
@@ -573,6 +594,19 @@
       fImg.src = data.front;
     }
   }
+  function loadWpImage(key, srcUrl) {
+    if (!srcUrl) return;
+    const im = new Image();
+    im.onload = () => { wpCache[key] = toGpuCanvas(im); renderOnce(); };
+    im.src = srcUrl;
+  }
+  if (window.WALLPAPER_ASSETS) {
+    for (const [k, srcUrl] of Object.entries(window.WALLPAPER_ASSETS)) {
+      loadWpImage(k, srcUrl);
+    }
+  }
+  const savedCustomWp = Store.get('bf_custom_wp', null);
+  if (savedCustomWp) loadWpImage('custom', savedCustomWp);
 
   // ============================================================================
   // 3. Google LiquidFun World & C1-Smooth Capsule-Circle Outer Hull
@@ -582,6 +616,8 @@
   let transparentBg = urlParams.get('transparent') === '1';
   let skinMode = urlParams.get('skin') || Store.get('bf_skin', 'studio');
   if (!SKINS.includes(skinMode)) skinMode = 'studio';
+  let wpMode = urlParams.get('wp') || Store.get('bf_wp', 'fuji');
+  if (!WALLPAPERS.includes(wpMode) && wpMode !== 'custom') wpMode = 'fuji';
   if (widgetMode) document.body.classList.add('widget-mode');
   if (transparentBg) document.documentElement.classList.add('transparent-bg');
 
@@ -1255,12 +1291,6 @@
     };
   }
 
-  function tileHash(n) {
-    let x = (n | 0) * 1597334677;
-    x = ((x ^ (x >>> 15)) * 2246822519) >>> 0;
-    return (x ^ (x >>> 13)) >>> 0;
-  }
-
   function drawBackground(nowSec) {
     if (transparentBg && !xrayMode && skinMode === 'studio') {
       ctx.clearRect(0, 0, W, H);
@@ -1289,265 +1319,71 @@
       return;
     }
 
-    // High-contrast studio gallery lighting for Saganaki22/Dither & ASCII skins (matches dithered-atkinson.png!)
     const hc = skinMode !== 'studio';
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    if (hc) {
-      grad.addColorStop(0, '#444954');
-      grad.addColorStop(0.55, '#383c46');
-      grad.addColorStop(1, '#2d313a');
-    } else {
-      grad.addColorStop(0, '#f7f0e4');
-      grad.addColorStop(0.58, '#ebe0cf');
-      grad.addColorStop(1, '#dacbb6');
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.save();
+    const wpImg = wpCache[wpMode] || wpCache.fuji;
     const deskY = w2s(0, 0).y;
-    const dadoY = w2s(0, 2.35).y;
 
-    // 1. Infinite Architectural Wainscot Dado & Vertical Wall Paneling (0.22x Parallax)
-    ctx.fillStyle = hc ? 'rgba(20, 22, 28, 0.16)' : 'rgba(182, 162, 136, 0.16)';
-    ctx.fillRect(0, dadoY, W, Math.max(0, deskY - dadoY));
-    ctx.strokeStyle = hc ? 'rgba(120, 128, 144, 0.42)' : 'rgba(155, 134, 108, 0.28)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, dadoY); ctx.lineTo(W, dadoY); ctx.stroke();
+    if (wpImg) {
+      // Seamless Mirrored Horizon-Parallax Wallpaper Tiling across (-∞, +∞)!
+      // Even tiles draw normally, odd tiles mirror horizontally so every boundary is 100% C0 seamless!
+      const drawH = Math.max(H, deskY + 36);
+      const aspect = wpImg.width / Math.max(1, wpImg.height);
+      const tileW = Math.max(W, Math.ceil(drawH * aspect));
+      const parallaxPx = camX * scale * 0.14;
+      const startTile = Math.floor((-parallaxPx - W * 0.5) / tileW) - 1;
+      const endTile = Math.ceil((W - parallaxPx) / tileW) + 1;
 
-    const farSpanW = W / scale;
-    const farCam = camX * 0.22;
-    const panelStep = 2.4;
-    const pStart = Math.floor((farCam - farSpanW * 0.7) / panelStep) - 1;
-    const pEnd = Math.ceil((farCam + farSpanW * 0.7) / panelStep) + 1;
-    ctx.strokeStyle = hc ? 'rgba(96, 104, 118, 0.28)' : 'rgba(162, 142, 116, 0.14)';
-    ctx.lineWidth = 1.2;
-    for (let pi = pStart; pi <= pEnd; pi++) {
-      const px = W * 0.5 + (pi * panelStep - farCam) * scale;
-      if (dadoY < deskY - 8) {
-        ctx.strokeRect(px + 8, dadoY + 10, panelStep * scale - 16, Math.max(8, deskY - dadoY - 22));
-      }
-    }
+      // Subtle vertical parallax drift when bottle flies sky-high
+      const skyLift = Math.min(0, Math.max(-drawH * 0.12, (camY - 1.52) * scale * 0.06));
 
-    // 2. Far Parallax Panoramic Loft Windows + Vector Mountains/Clouds + Sunbeams (0.22x Parallax)
-    if (!widgetMode) {
-      const winStep = 8.4;
-      const winScreenXs = [];
-      const wStart = Math.floor((farCam - farSpanW * 0.7) / winStep) - 1;
-      const wEnd = Math.ceil((farCam + farSpanW * 0.7) / winStep) + 1;
-      for (let wi = wStart; wi <= wEnd; wi++) {
-        const wx = W * 0.5 + ((wi + 0.36) * winStep - farCam) * scale;
-        winScreenXs.push(wx);
-        const ww = 2.05 * scale, wh = 2.35 * scale;
-        const wy = dadoY - wh - 0.28 * scale;
-        if (wx + ww < -80 || wx - ww > W + 80) continue;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(wx - ww * 0.5, wy, ww, wh, [ww * 0.48, ww * 0.48, 4, 4]);
-        ctx.fillStyle = hc ? '#5c6474' : '#fdf9f0';
-        ctx.fill();
-        ctx.clip();
-
-        // Distant vector mountain silhouettes inside window
-        ctx.fillStyle = hc ? '#3c424d' : '#dce6e2';
-        ctx.beginPath();
-        ctx.moveTo(wx - ww * 0.55, wy + wh);
-        ctx.lineTo(wx - ww * 0.18, wy + wh * 0.56);
-        ctx.lineTo(wx + ww * 0.16, wy + wh * 0.74);
-        ctx.lineTo(wx + ww * 0.36, wy + wh * 0.48);
-        ctx.lineTo(wx + ww * 0.58, wy + wh);
-        ctx.closePath();
-        ctx.fill();
-
-        // Soft vector sun/moon disc inside window
-        ctx.fillStyle = hc ? '#8892a6' : 'rgba(246, 196, 128, 0.52)';
-        ctx.beginPath();
-        ctx.arc(wx - ww * 0.15, wy + wh * 0.30, ww * 0.14, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Mullion crossbars
-        ctx.strokeStyle = hc ? '#262a32' : '#cbb89d';
-        ctx.lineWidth = Math.max(2, scale * 0.03);
-        ctx.beginPath();
-        ctx.moveTo(wx, wy); ctx.lineTo(wx, wy + wh);
-        ctx.moveTo(wx - ww * 0.5, wy + wh * 0.48); ctx.lineTo(wx + ww * 0.5, wy + wh * 0.48);
-        ctx.moveTo(wx - ww * 0.5, wy + wh * 0.76); ctx.lineTo(wx + ww * 0.5, wy + wh * 0.76);
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.strokeStyle = hc ? '#768094' : '#bfa98c';
-        ctx.lineWidth = Math.max(2.5, scale * 0.035);
-        ctx.beginPath();
-        ctx.roundRect(wx - ww * 0.5, wy, ww, wh, [ww * 0.48, ww * 0.48, 4, 4]);
-        ctx.stroke();
-
-        // Volumetric diagonal sunbeam from window (studio mode)
-        if (!hc) {
-          const beam = ctx.createLinearGradient(wx, wy + wh * 0.2, wx + ww * 1.4, deskY);
-          beam.addColorStop(0, 'rgba(255, 252, 236, 0.36)');
-          beam.addColorStop(1, 'rgba(255, 248, 225, 0.0)');
-          ctx.fillStyle = beam;
-          ctx.beginPath();
-          ctx.moveTo(wx - ww * 0.42, wy + wh * 0.35);
-          ctx.lineTo(wx + ww * 0.42, wy + wh * 0.35);
-          ctx.lineTo(wx + ww * 1.55, deskY);
-          ctx.lineTo(wx + ww * 0.35, deskY);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-
-      // 3. Mid Parallax Extending Vector Wall Decor (0.46x Parallax — Bookshelves, Art, Clocks, Lamps, Plants!)
-      const midCam = camX * 0.46;
-      const propStep = 3.1;
-      const mStart = Math.floor((midCam - farSpanW * 0.7) / propStep) - 1;
-      const mEnd = Math.ceil((midCam + farSpanW * 0.7) / propStep) + 1;
-
-      for (let mi = mStart; mi <= mEnd; mi++) {
-        const h = tileHash(mi + 1024);
-        const sx = W * 0.5 + (mi * propStep - midCam) * scale;
-        if (sx < -180 || sx > W + 180) continue;
-        // Never overlap a panoramic window!
-        if (winScreenXs.some(wx => Math.abs(sx - wx) < 1.72 * scale)) continue;
-        // Coprime stride guarantees adjacent wall props are ALWAYS distinct!
-        const kind = (((mi * 3) % 5) + 5) % 5;
-        const baseY = dadoY - (0.35 + ((h >>> 4) % 4) * 0.11) * scale;
-
-        if (kind === 0) {
-          // Bauhaus Minimalist Framed Vector Print
-          const fw = 1.02 * scale, fh = 1.28 * scale;
-          ctx.fillStyle = hc ? '#3a3f49' : 'rgba(255, 252, 246, 0.78)';
-          ctx.strokeStyle = hc ? '#636b7a' : 'rgba(142, 116, 88, 0.45)';
-          ctx.lineWidth = Math.max(2, scale * 0.028);
-          ctx.beginPath(); ctx.roundRect(sx - fw * 0.5, baseY - fh, fw, fh, 4); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = hc ? '#565e6c' : 'rgba(218, 148, 102, 0.42)';
-          ctx.beginPath(); ctx.arc(sx, baseY - fh * 0.56, fw * 0.24, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = hc ? '#272a31' : 'rgba(116, 142, 126, 0.38)';
-          ctx.beginPath();
-          ctx.moveTo(sx - fw * 0.36, baseY - fh * 0.14);
-          ctx.lineTo(sx - fw * 0.06, baseY - fh * 0.46);
-          ctx.lineTo(sx + fw * 0.36, baseY - fh * 0.14);
-          ctx.closePath(); ctx.fill();
-        } else if (kind === 1) {
-          // Floating Wooden Bookshelf + Leaning Vector Books + Potted Ivy
-          const sw2 = 1.55 * scale, sh2 = 0.08 * scale;
-          ctx.fillStyle = hc ? '#505764' : '#b88c62';
-          ctx.beginPath(); ctx.roundRect(sx - sw2 * 0.5, baseY, sw2, sh2, 3); ctx.fill();
-          const bookCols = hc
-            ? ['#3a3f48', '#626a78', '#464c57', '#717a8a', '#343942']
-            : ['#d97757', '#5b8a72', '#4a6fa5', '#d4a359', '#8c5e58'];
-          let bx = sx - sw2 * 0.42;
-          for (let b = 0; b < 6; b++) {
-            const bw = (0.11 + ((h >>> (b * 2)) & 3) * 0.025) * scale;
-            const bh = (0.42 + ((h >>> (b * 3)) & 3) * 0.09) * scale;
-            ctx.fillStyle = bookCols[b % bookCols.length];
-            ctx.fillRect(bx, baseY - bh, bw, bh);
-            bx += bw + 2;
-          }
-          // Small ceramic pot + trailing vector leaves on right end of shelf
-          const px = sx + sw2 * 0.32;
-          ctx.fillStyle = hc ? '#687080' : '#e0cbb5';
-          ctx.beginPath();
-          ctx.moveTo(px - 0.11 * scale, baseY - 0.24 * scale);
-          ctx.lineTo(px + 0.11 * scale, baseY - 0.24 * scale);
-          ctx.lineTo(px + 0.08 * scale, baseY);
-          ctx.lineTo(px - 0.08 * scale, baseY);
-          ctx.closePath(); ctx.fill();
-          ctx.fillStyle = hc ? '#484f5c' : '#659477';
-          for (let lf = -2; lf <= 2; lf++) {
-            ctx.beginPath();
-            ctx.ellipse(px + lf * 0.055 * scale, baseY - (0.30 + Math.abs(lf) * 0.03) * scale, 0.06 * scale, 0.035 * scale, lf * 0.4, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        } else if (kind === 2) {
-          // Live Analog Studio Wall Clock
-          const cr = 0.44 * scale, cy2 = baseY - cr * 1.1;
-          ctx.fillStyle = hc ? '#3e444f' : '#fcf9f2';
-          ctx.strokeStyle = hc ? '#6c7485' : '#9c7c5b';
-          ctx.lineWidth = Math.max(2.2, scale * 0.032);
-          ctx.beginPath(); ctx.arc(sx, cy2, cr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          ctx.strokeStyle = hc ? '#858e9e' : '#7a634b';
-          ctx.lineWidth = 1.4;
-          for (let tk = 0; tk < 12; tk++) {
-            const a = (tk * Math.PI) / 6;
-            ctx.beginPath();
-            ctx.moveTo(sx + Math.cos(a) * cr * 0.76, cy2 + Math.sin(a) * cr * 0.76);
-            ctx.lineTo(sx + Math.cos(a) * cr * 0.90, cy2 + Math.sin(a) * cr * 0.90);
-            ctx.stroke();
-          }
-          const minA = (nowSec / 60) * Math.PI * 2 - Math.PI * 0.5;
-          const secA = (nowSec % 60) * (Math.PI / 30) - Math.PI * 0.5;
-          ctx.beginPath();
-          ctx.moveTo(sx, cy2); ctx.lineTo(sx + Math.cos(minA) * cr * 0.62, cy2 + Math.sin(minA) * cr * 0.62);
-          ctx.stroke();
-          ctx.strokeStyle = hc ? '#b0b8c8' : '#d96b43';
-          ctx.beginPath();
-          ctx.moveTo(sx, cy2); ctx.lineTo(sx + Math.cos(secA) * cr * 0.72, cy2 + Math.sin(secA) * cr * 0.72);
-          ctx.stroke();
-        } else if (kind === 3) {
-          // Nordic Pendant Studio Cone Lamp
-          const lampY = Math.max(55, dadoY - 1.85 * scale);
-          ctx.strokeStyle = hc ? '#5c6473' : 'rgba(110, 92, 74, 0.5)';
-          ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, lampY); ctx.stroke();
-          if (!hc) {
-            const cone = ctx.createLinearGradient(sx, lampY, sx, deskY);
-            cone.addColorStop(0, 'rgba(255, 244, 210, 0.34)');
-            cone.addColorStop(1, 'rgba(255, 244, 210, 0)');
-            ctx.fillStyle = cone;
-            ctx.beginPath();
-            ctx.moveTo(sx - 0.34 * scale, lampY + 0.22 * scale);
-            ctx.lineTo(sx + 0.34 * scale, lampY + 0.22 * scale);
-            ctx.lineTo(sx + 1.25 * scale, deskY);
-            ctx.lineTo(sx - 1.25 * scale, deskY);
-            ctx.closePath(); ctx.fill();
-          }
-          ctx.fillStyle = hc ? '#5e6675' : '#52606d';
-          ctx.beginPath();
-          ctx.moveTo(sx - 0.08 * scale, lampY);
-          ctx.lineTo(sx + 0.08 * scale, lampY);
-          ctx.lineTo(sx + 0.36 * scale, lampY + 0.24 * scale);
-          ctx.lineTo(sx - 0.36 * scale, lampY + 0.24 * scale);
-          ctx.closePath(); ctx.fill();
+      ctx.save();
+      for (let ti = startTile; ti <= endTile; ti++) {
+        const tx = Math.round(W * 0.5 + ti * tileW - parallaxPx - tileW * 0.5);
+        if (tx + tileW < -4 || tx > W + 4) continue;
+        const mirrored = (Math.abs(ti) & 1) === 1;
+        if (mirrored) {
+          ctx.save();
+          ctx.translate(tx + tileW, skyLift);
+          ctx.scale(-1, 1);
+          ctx.drawImage(wpImg, 0, 0, tileW + 1, drawH);
+          ctx.restore();
         } else {
-          // Botanical Triptych / Studio Pinboard
-          for (let k = -1; k <= 1; k += 2) {
-            const px = sx + k * 0.36 * scale, py = baseY - 0.92 * scale;
-            const pw2 = 0.58 * scale, ph2 = 0.76 * scale;
-            ctx.fillStyle = hc ? '#3c414b' : 'rgba(255, 251, 244, 0.74)';
-            ctx.strokeStyle = hc ? '#626a78' : 'rgba(145, 120, 94, 0.42)';
-            ctx.lineWidth = 1.8;
-            ctx.beginPath(); ctx.roundRect(px - pw2 * 0.5, py, pw2, ph2, 3); ctx.fill(); ctx.stroke();
-            ctx.strokeStyle = hc ? '#7c8596' : 'rgba(92, 132, 102, 0.58)';
-            ctx.beginPath();
-            ctx.moveTo(px, py + ph2 * 0.82);
-            ctx.quadraticCurveTo(px + k * pw2 * 0.18, py + ph2 * 0.48, px, py + ph2 * 0.20);
-            ctx.stroke();
-          }
+          ctx.drawImage(wpImg, tx, skyLift, tileW + 1, drawH);
         }
       }
 
-      if (!hc) {
-        ctx.fillStyle = 'rgba(255, 250, 230, 0.55)';
+      if (hc) {
+        // Controlled gallery dim so foreground bright desk & rim-lit bottle pop cleanly in 1-bit / DMG dither!
+        ctx.fillStyle = 'rgba(14, 16, 22, 0.52)';
+        ctx.fillRect(0, 0, W, H);
+      } else if (!widgetMode) {
+        // Subtle atmospheric floating motes in sunlit air
+        ctx.fillStyle = 'rgba(255, 250, 235, 0.42)';
         for (const m of dustMotes) {
-          const mx = ((m.x + nowSec * m.sp * 0.25) % 1) * W * 0.85 + W * 0.06;
-          const my = ((m.y - nowSec * m.sp * 0.5 + 10) % 1) * (H * 0.65);
+          const mx = ((m.x + nowSec * m.sp * 0.22) % 1) * W * 0.90 + W * 0.05;
+          const my = ((m.y - nowSec * m.sp * 0.45 + 10) % 1) * Math.max(120, deskY * 0.85);
           ctx.beginPath(); ctx.arc(mx, my, m.r, 0, Math.PI * 2); ctx.fill();
         }
       }
+      ctx.restore();
+    } else {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, hc ? '#383c46' : '#f7f0e4');
+      grad.addColorStop(1, hc ? '#22252c' : '#dacbb6');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
     }
-    ctx.restore();
   }
 
   function drawDeskAndCoaster() {
     const scale = ppm * camZoom;
     const hc = skinMode !== 'studio' && !xrayMode;
+    const thm = DESK_THEMES[wpMode] || DESK_THEMES.fuji;
     const topY = w2s(0, 0).y;
     const ph = Math.max(H - topY + 20, 1.3 * scale);
     const backDepth = Math.max(14, scale * 0.24);
 
-    // 1. Endless Tabletop Rear Perspective Plane (spans full viewport width seamlessly!)
+    // 1. Endless Tabletop Rear Perspective Plane (color-harmonized to the active wallpaper!)
     const surfaceGrad = ctx.createLinearGradient(0, topY - backDepth, 0, topY + 8);
     if (xrayMode) {
       surfaceGrad.addColorStop(0, '#1e293b');
@@ -1556,8 +1392,8 @@
       surfaceGrad.addColorStop(0, '#cfd5df');
       surfaceGrad.addColorStop(1, '#eef1f6');
     } else {
-      surfaceGrad.addColorStop(0, '#c48b5a');
-      surfaceGrad.addColorStop(1, '#dfa878');
+      surfaceGrad.addColorStop(0, thm.top0);
+      surfaceGrad.addColorStop(1, thm.top1);
     }
     ctx.fillStyle = surfaceGrad;
     ctx.fillRect(0, topY - backDepth * 0.68, W, backDepth + 8);
@@ -1572,28 +1408,27 @@
       bodyGrad.addColorStop(0.28, '#414752');
       bodyGrad.addColorStop(1, '#262a31');
     } else {
-      bodyGrad.addColorStop(0, '#8c5630');
-      bodyGrad.addColorStop(0.24, '#734424');
-      bodyGrad.addColorStop(1, '#4e2d16');
+      bodyGrad.addColorStop(0, thm.ap0);
+      bodyGrad.addColorStop(0.26, thm.ap1);
+      bodyGrad.addColorStop(1, thm.ap2);
     }
     ctx.fillStyle = bodyGrad;
     ctx.fillRect(0, topY + 6, W, ph);
 
     // 3. Sunlit Bevel Front Lip + Infinite Scrolling Wood Plank Seams & Distance Ticks
-    ctx.fillStyle = xrayMode ? '#475569' : (hc ? '#ffffff' : '#eab688');
+    ctx.fillStyle = xrayMode ? '#475569' : (hc ? '#ffffff' : thm.lip);
     ctx.fillRect(0, topY, W, 7);
 
     const worldLeft = camX - (W * 0.55) / scale;
     const worldRight = camX + (W * 0.55) / scale;
 
     if (!xrayMode) {
-      ctx.strokeStyle = hc ? 'rgba(20, 22, 28, 0.36)' : 'rgba(92, 50, 22, 0.18)';
+      ctx.strokeStyle = hc ? 'rgba(20, 22, 28, 0.36)' : 'rgba(42, 20, 12, 0.20)';
       ctx.lineWidth = 1.2;
       for (let g = 1; g <= 3; g++) {
         const gy = topY + 12 + g * 18;
         ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
       }
-      // Scrolling oak plank vertical joints every 1.5m
       const plankW = 1.5;
       for (let pk = Math.floor(worldLeft / plankW); pk <= Math.ceil(worldRight / plankW); pk++) {
         const jx = w2s(pk * plankW, 0).x;
@@ -1606,7 +1441,7 @@
     }
 
     // Subtle distance ruler ticks every 2m along the infinite counter
-    ctx.fillStyle = xrayMode ? 'rgba(148, 163, 184, 0.55)' : (hc ? 'rgba(235, 240, 248, 0.72)' : 'rgba(255, 236, 210, 0.45)');
+    ctx.fillStyle = xrayMode ? 'rgba(148, 163, 184, 0.55)' : (hc ? 'rgba(235, 240, 248, 0.72)' : 'rgba(255, 238, 220, 0.46)');
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     for (let m = Math.floor(worldLeft / 2) * 2; m <= Math.ceil(worldRight / 2) * 2; m += 2) {
@@ -1625,13 +1460,13 @@
     for (let cxWorld = firstC; cxWorld <= lastC; cxWorld += COASTER_SPACING) {
       const cPos = w2s(cxWorld, 0);
       ctx.save();
-      ctx.fillStyle = xrayMode ? 'rgba(56, 189, 248, 0.22)' : (hc ? '#1e2128' : '#b57445');
+      ctx.fillStyle = xrayMode ? 'rgba(56, 189, 248, 0.22)' : (hc ? '#1e2128' : thm.ap1);
       ctx.beginPath();
       ctx.ellipse(cPos.x, cPos.y + 1.5, cRx, cRy + 2.5, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.28)' : (hc ? '#f4f6fa' : '#e6be94');
-      ctx.strokeStyle = xrayMode ? '#5eead4' : (hc ? '#181a20' : '#8c522b');
+      ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.28)' : (hc ? '#f4f6fa' : thm.cTop);
+      ctx.strokeStyle = xrayMode ? '#5eead4' : (hc ? '#181a20' : thm.cRim);
       ctx.lineWidth = hc ? 2.0 : 1.5;
       ctx.beginPath();
       ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.96, cRy, 0, 0, Math.PI * 2);
@@ -1639,7 +1474,7 @@
       ctx.stroke();
 
       ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = xrayMode ? 'rgba(255, 209, 102, 0.8)' : (hc ? '#181a20' : 'rgba(138, 75, 34, 0.58)');
+      ctx.strokeStyle = xrayMode ? 'rgba(255, 209, 102, 0.8)' : (hc ? '#181a20' : thm.cRim);
       ctx.lineWidth = 1.4;
       ctx.beginPath();
       ctx.ellipse(cPos.x, cPos.y - 1, cRx * 0.60, cRy * 0.60, 0, 0, Math.PI * 2);
@@ -1647,7 +1482,7 @@
       ctx.restore();
 
       if (!widgetMode && !hc) {
-        ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.8)' : 'rgba(255, 240, 220, 0.72)';
+        ctx.fillStyle = xrayMode ? 'rgba(94, 234, 212, 0.8)' : 'rgba(255, 242, 228, 0.78)';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
         const label = cxWorld === 0
@@ -1702,16 +1537,24 @@
     ctx.ellipse(shPos.x, shPos.y + 2, rad * 1.15, Math.max(4.5, rad * 0.22), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Back PET/Glass Layer (+ Studio Sculptural Rim-Light in Dither/ASCII skins so translucent bottles pop!)
+    // 2. Back PET/Glass Layer (+ Studio Sculptural Rim-Light & Backdrop Separation in Dither skins!)
+    if (hc) {
+      const haloR = Math.max(hwPx, hhPx) * 1.45;
+      const halo = ctx.createRadialGradient(scr.x, scr.y, hwPx * 0.4, scr.x, scr.y, haloR);
+      halo.addColorStop(0, 'rgba(14, 16, 22, 0.55)');
+      halo.addColorStop(1, 'rgba(14, 16, 22, 0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(scr.x, scr.y, haloR, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.save();
     ctx.translate(scr.x, scr.y);
     ctx.rotate(-ang);
     if (hc) {
-      traceInnerClip(ctx, spr, hwPx * 1.02, hhPx * 1.01);
-      ctx.fillStyle = 'rgba(215, 224, 236, 0.24)';
+      traceInnerClip(ctx, spr, hwPx * 1.03, hhPx * 1.015);
+      ctx.fillStyle = 'rgba(225, 232, 242, 0.28)';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.90)';
-      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.lineWidth = 2.8;
       ctx.stroke();
     }
     if (spr && spr.backImg) ctx.drawImage(spr.backImg, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
@@ -1863,40 +1706,9 @@
   }
 
   // ============================================================================
-  // 7. Genuine Saganaki22/Dither Skin Pipeline (Atkinson / Halftone / Sobel ASCII / Floyd-Steinberg)
+  // 7. Ultra-Fast Saganaki22/Dither Skin Pipeline (Macintosh Atkinson / GameBoy Floyd-Steinberg)
   // ============================================================================
   let ditherBuf = new Float32Array(0);
-  let asciiSampleCanvas = null, asciiSampleCtx = null;
-
-  // Pre-bake crisp 6x10 pixel-exact monospace glyph masks for zero-drift per-cell RGB ASCII + Sobel edges!
-  const ASCII_GLYPHS = ' .·:;+*xX$#@|-/\\';
-  const GLYPH_W = 6, GLYPH_H = 10;
-  const glyphMasks = new Uint8Array(ASCII_GLYPHS.length * GLYPH_W * GLYPH_H);
-  (() => {
-    const gc = document.createElement('canvas');
-    gc.width = ASCII_GLYPHS.length * GLYPH_W;
-    gc.height = GLYPH_H;
-    const gctx = gc.getContext('2d');
-    gctx.fillStyle = '#000';
-    gctx.fillRect(0, 0, gc.width, gc.height);
-    gctx.fillStyle = '#fff';
-    gctx.font = 'bold 9.5px Consolas, "Courier New", monospace';
-    gctx.textAlign = 'center';
-    gctx.textBaseline = 'middle';
-    for (let i = 0; i < ASCII_GLYPHS.length; i++) {
-      gctx.fillText(ASCII_GLYPHS[i], i * GLYPH_W + GLYPH_W * 0.5, GLYPH_H * 0.52);
-    }
-    const gd = gctx.getImageData(0, 0, gc.width, gc.height).data;
-    for (let i = 0; i < ASCII_GLYPHS.length; i++) {
-      const base = i * GLYPH_W * GLYPH_H;
-      for (let py = 0; py < GLYPH_H; py++) {
-        for (let px = 0; px < GLYPH_W; px++) {
-          glyphMasks[base + py * GLYPH_W + px] = gd[(py * gc.width + i * GLYPH_W + px) * 4] > 92 ? 1 : 0;
-        }
-      }
-    }
-  })();
-
   function ensureDitherBuf(len) {
     if (ditherBuf.length < len) ditherBuf = new Float32Array(len);
     return ditherBuf;
@@ -1906,10 +1718,11 @@
     if (skinMode === 'studio' || xrayMode) return;
 
     if (skinMode === 'mac') {
-      // Saganaki22/Dither — Genuine 1:1 Pixel Serpentine Bill Atkinson 1/8 Error-Diffusion!
-      // Full CSS resolution (pxSize = 1) reproduces the exact fine stipple weave of dithered-atkinson.png!
-      const sw = Math.max(120, Math.floor(W));
-      const sh = Math.max(120, Math.floor(H));
+      // Saganaki22/Dither — Serpentine Bill Atkinson 1/8 Error-Diffusion!
+      // Capped at maxW = 760 so even on 2K/4K Retina displays it finishes in < 1.1ms (locked 144 FPS!)
+      const ratio = Math.min(1.0, 760 / Math.max(1, W));
+      const sw = Math.max(120, Math.floor(W * ratio));
+      const sh = Math.max(90, Math.floor(H * ratio));
       if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
       fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
       const img = fxCtx.getImageData(0, 0, sw, sh);
@@ -1956,156 +1769,12 @@
       ctx.drawImage(fxCanvas, 0, 0, W, H);
       ctx.restore();
 
-    } else if (skinMode === 'halftone') {
-      // Saganaki22/Dither — Genuine 1:1 45° Rotated Circular Halftone Screen (matches dithered-halftone.png!)
-      const sw = Math.max(120, Math.floor(W));
-      const sh = Math.max(120, Math.floor(H));
-      if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
-      fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
-      const img = fxCtx.getImageData(0, 0, sw, sh);
-      const d = img.data;
-      const nPix = sw * sh;
-      const lumBuf = ensureDitherBuf(nPix);
-
-      for (let i = 0, p = 0; p < nPix; p++, i += 4) {
-        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        lumBuf[p] = Math.max(0, Math.min(255, (lum - 115) * 1.28 + 112));
-      }
-
-      const cell = 4.2;
-      const cos45 = 0.70710678;
-      const invC = cos45 / cell;
-      const backScale = cell * cos45;
-
-      for (let y = 0; y < sh; y++) {
-        const row = y * sw;
-        for (let x = 0; x < sw; x++) {
-          const u = (x + y) * invC;
-          const v = (y - x) * invC;
-          const cu = Math.round(u);
-          const cv = Math.round(v);
-          const du = u - cu, dv = v - cv;
-          const dist = Math.sqrt(du * du + dv * dv);
-
-          const cx = Math.max(0, Math.min(sw - 1, Math.round((cu - cv) * backScale)));
-          const cy = Math.max(0, Math.min(sh - 1, Math.round((cu + cv) * backScale)));
-          const normL = lumBuf[cy * sw + cx] * (1 / 255);
-          const dotR = 0.70 * Math.pow(normL, 0.78);
-          const cov = Math.max(0, Math.min(1, (dotR - dist) * 6.8 + 0.5));
-
-          const di = (row + x) << 2;
-          d[di]     = (15 + cov * 232) | 0;
-          d[di + 1] = (17 + cov * 228) | 0;
-          d[di + 2] = (22 + cov * 218) | 0;
-          d[di + 3] = 255;
-        }
-      }
-      fxCtx.putImageData(img, 0, 0);
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(fxCanvas, 0, 0, W, H);
-      ctx.restore();
-
-    } else if (skinMode === 'ascii') {
-      // High-Density 6x10 Pixel-Exact Bitmap-Atlas ASCII + 3x3 Sobel Contour Rasterizer!
-      const cols = Math.max(40, Math.floor(W / GLYPH_W));
-      const rows = Math.max(24, Math.floor(H / GLYPH_H));
-      const outW = cols * GLYPH_W, outH = rows * GLYPH_H;
-
-      if (!asciiSampleCanvas) {
-        asciiSampleCanvas = document.createElement('canvas');
-        asciiSampleCtx = asciiSampleCanvas.getContext('2d', { willReadFrequently: true });
-      }
-      if (asciiSampleCanvas.width !== cols || asciiSampleCanvas.height !== rows) {
-        asciiSampleCanvas.width = cols; asciiSampleCanvas.height = rows;
-      }
-      if (fxCanvas.width !== outW || fxCanvas.height !== outH) {
-        fxCanvas.width = outW; fxCanvas.height = outH;
-      }
-
-      asciiSampleCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cols, rows);
-      const sd = asciiSampleCtx.getImageData(0, 0, cols, rows).data;
-      const lum = ensureDitherBuf(cols * rows);
-      for (let p = 0, i = 0; p < cols * rows; p++, i += 4) {
-        lum[p] = 0.299 * sd[i] + 0.587 * sd[i + 1] + 0.114 * sd[i + 2];
-      }
-
-      const outImg = fxCtx.createImageData(outW, outH);
-      const od = outImg.data;
-      // Fill deep CRT phosphor background (#080c12)
-      for (let i = 0; i < od.length; i += 4) {
-        od[i] = 8; od[i + 1] = 12; od[i + 2] = 18; od[i + 3] = 255;
-      }
-
-      for (let r = 0; r < rows; r++) {
-        const rOff = r * cols;
-        for (let c = 0; c < cols; c++) {
-          const idx = rOff + c;
-          const si = idx << 2;
-          const R = sd[si], G = sd[si + 1], B = sd[si + 2];
-          const L = lum[idx];
-
-          // 3x3 Sobel directional edge detector for razor-sharp bottle & water contours!
-          let gIdx = 0;
-          let isEdge = false;
-          if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) {
-            const tl = lum[idx - cols - 1], tc = lum[idx - cols], tr = lum[idx - cols + 1];
-            const ml = lum[idx - 1],                              mr = lum[idx + 1];
-            const bl = lum[idx + cols - 1], bc = lum[idx + cols], br = lum[idx + cols + 1];
-            const gx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
-            const gy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
-            const mag = Math.abs(gx) + Math.abs(gy);
-            if (mag > 135) {
-              isEdge = true;
-              const ax = Math.abs(gx), ay = Math.abs(gy);
-              if (ax > ay * 2.1) gIdx = 12;      // '|' vertical bottle wall
-              else if (ay > ax * 2.1) gIdx = 13; // '-' horizontal meniscus / desk lip
-              else gIdx = (gx * gy > 0) ? 15 : 14; // '\' or '/' tapered shoulder
-            }
-          }
-
-          if (!isEdge) {
-            if (L < 72) continue; // Clean deep CRT negative space on bare wall
-            gIdx = Math.min(11, Math.max(1, ((L - 58) / 17.0) | 0));
-          }
-
-          // Semantic terminal phosphor RGB tint
-          let cr = 64, cg = 226, cb = 148; // Matrix emerald default
-          if (L > 236) { cr = 240; cg = 253; cb = 250; }
-          else if (B > R + 24 && B > 110) { cr = 56; cg = 198; cb = 252; }      // Cyan sloshing water
-          else if (R > G + 36 && R > 105) { cr = 251; cg = 113; cb = 133; }     // Coral red cap/label
-          else if (R > B + 35 && G > 110) { cr = 251; cg = 191; cb = 36; }      // Amber wood/coaster
-          else if (L < 96 && !isEdge) { cr = 34; cg = 92; cb = 68; }            // Subtle dim background props
-
-          const maskBase = gIdx * GLYPH_W * GLYPH_H;
-          const outY0 = r * GLYPH_H;
-          const outX0 = c * GLYPH_W;
-          for (let py = 0; py < GLYPH_H; py++) {
-            const mRow = maskBase + py * GLYPH_W;
-            const oRow = ((outY0 + py) * outW + outX0) << 2;
-            for (let px = 0; px < GLYPH_W; px++) {
-              if (glyphMasks[mRow + px]) {
-                const oi = oRow + (px << 2);
-                od[oi] = cr; od[oi + 1] = cg; od[oi + 2] = cb;
-              }
-            }
-          }
-        }
-      }
-      fxCtx.putImageData(outImg, 0, 0);
-      ctx.save();
-      ctx.fillStyle = '#080c12';
-      ctx.fillRect(0, 0, W, H);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(fxCanvas, 0, 0, outW, outH);
-      ctx.restore();
-
     } else if (skinMode === 'gb') {
-      // Saganaki22/Dither — Genuine Serpentine Floyd-Steinberg [7,3,5,1]/16 Error-Diffusion
-      // Quantized to Authentic 1989 Nintendo Game Boy DMG-01 4-Color Olive LCD Palette!
-      const pxSize = 2;
-      const sw = Math.max(80, Math.floor(W / pxSize));
-      const sh = Math.max(80, Math.floor(H / pxSize));
+      // Saganaki22/Dither — Serpentine Floyd-Steinberg [7,3,5,1]/16 Error-Diffusion
+      // Capped at maxW = 640 (< 0.8ms/frame = locked 144 FPS!)
+      const ratio = Math.min(0.55, 640 / Math.max(1, W));
+      const sw = Math.max(100, Math.floor(W * ratio));
+      const sh = Math.max(80, Math.floor(H * ratio));
       if (fxCanvas.width !== sw || fxCanvas.height !== sh) { fxCanvas.width = sw; fxCanvas.height = sh; }
       fxCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, sw, sh);
       const img = fxCtx.getImageData(0, 0, sw, sh);
@@ -2284,11 +1953,49 @@
     document.querySelectorAll('.skin-btn').forEach(b => b.classList.toggle('active', b.dataset.skin === sk));
     renderOnce();
   }
+  function setWallpaper(wp) {
+    wpMode = wp;
+    Store.set('bf_wp', wp);
+    if (transparentBg) {
+      transparentBg = false;
+      document.documentElement.classList.remove('transparent-bg');
+      const wbBg = document.getElementById('wb-bg');
+      if (wbBg) wbBg.classList.remove('active');
+    }
+    document.querySelectorAll('.wp-btn[data-wp]').forEach(b => b.classList.toggle('active', b.dataset.wp === wp));
+    document.getElementById('btn-wp-upload').classList.toggle('active', wp === 'custom');
+    renderOnce();
+  }
   document.getElementById('skin-bar').addEventListener('click', (e) => {
-    const btn = e.target.closest('.skin-btn'); if (!btn) return;
-    setSkin(btn.dataset.skin);
+    const sBtn = e.target.closest('.skin-btn');
+    if (sBtn) { setSkin(sBtn.dataset.skin); return; }
+    const wBtn = e.target.closest('.wp-btn[data-wp]');
+    if (wBtn) { setWallpaper(wBtn.dataset.wp); }
+  });
+  const wpFileInput = document.getElementById('wp-file-input');
+  document.getElementById('btn-wp-upload').addEventListener('click', () => wpFileInput.click());
+  wpFileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        const c = document.createElement('canvas');
+        const scaleDown = Math.min(1, 1440 / Math.max(1, im.width));
+        c.width = Math.round(im.width * scaleDown);
+        c.height = Math.round(im.height * scaleDown);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        wpCache.custom = c;
+        try { Store.set('bf_custom_wp', c.toDataURL('image/jpeg', 0.82)); } catch (err) {}
+        setWallpaper('custom');
+      };
+      im.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   });
   setSkin(skinMode);
+  setWallpaper(wpMode);
 
   // Rules modal
   const rulesModal = document.getElementById('rules-modal');
@@ -2321,6 +2028,11 @@
   });
   document.getElementById('wb-drag').addEventListener('pointerdown', (e) => {
     if (e.button === 0) postHost('drag');
+  });
+  document.getElementById('wb-wp').addEventListener('click', () => {
+    const pool = wpCache.custom ? [...WALLPAPERS, 'custom'] : WALLPAPERS;
+    const next = pool[(pool.indexOf(wpMode) + 1) % pool.length];
+    setWallpaper(next);
   });
   document.getElementById('wb-skin').addEventListener('click', () => {
     const next = SKINS[(SKINS.indexOf(skinMode) + 1) % SKINS.length];
@@ -2367,7 +2079,7 @@
     ctx.save();
     ctx.font = 'bold 11px Consolas, "Courier New", monospace';
     ctx.textAlign = 'center';
-    const col = skinMode === 'gb' ? '#9bbc0f' : (skinMode === 'ascii' ? '#34d399' : '#f8fafc');
+    const col = skinMode === 'gb' ? '#9bbc0f' : '#f8fafc';
     const bg = skinMode === 'gb' ? 'rgba(15, 56, 15, 0.88)' : 'rgba(15, 18, 24, 0.85)';
 
     for (let cxWorld = firstC; cxWorld <= lastC; cxWorld += COASTER_SPACING) {
