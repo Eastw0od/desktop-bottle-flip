@@ -262,11 +262,12 @@
   </div>
 
   <div class="skin-bar" id="skin-bar">
-    <button class="wp-btn active" data-wp="fuji" title="开源壁纸: Catppuccin Mt.Fuji Forest">🗻 富士云霞</button>
-    <button class="wp-btn" data-wp="clearday" title="开源壁纸: Catppuccin Clear Day Lake">🏔️ 晴日雪湖</button>
-    <button class="wp-btn" data-wp="valley" title="开源壁纸: Catppuccin Shaded Valley">🌄 暮紫群山</button>
-    <button class="wp-btn" data-wp="evening" title="开源壁纸: Catppuccin Evening Sky">🌆 晚风粉云</button>
-    <button class="wp-btn" data-wp="pier" title="开源壁纸: Elementary OS Sunset Pier">🌅 静海长桥</button>
+    <button class="wp-btn active" data-wp="wave" title="公有领域名作：葛饰北斋《神奈川冲浪里》(1831)">🌊 神奈川冲浪</button>
+    <button class="wp-btn" data-wp="starry" title="公有领域名作：文森特·梵高《星月夜》(1889)">🌌 梵高星月夜</button>
+    <button class="wp-btn" data-wp="qianli" title="公有领域名作：北宋·王希孟《千里江山图》长卷">🏔️ 千里江山图</button>
+    <button class="wp-btn" data-wp="fuji" title="公有领域名作：葛饰北斋《凯风快晴·赤富士》(1831)">🗻 凯风赤富士</button>
+    <button class="wp-btn" data-wp="monet" title="公有领域名作：克劳德·莫奈《日出·印象》(1872)">🌅 日出·印象</button>
+    <button class="wp-btn" data-wp="wheat" title="公有领域名作：文森特·梵高《麦田与柏树》(1889)">🌾 金色麦田</button>
     <button class="wp-btn" id="btn-wp-upload" title="从电脑选择任意自定义壁纸">📂 本地壁纸</button>
     <input type="file" id="wp-file-input" accept="image/*" style="display:none">
     <span class="bar-sep"></span>
@@ -329,7 +330,8 @@
   <!-- LIQUIDFUN_INLINE_PLACEHOLDER -->
 
 <script>
-(() => {
+(async () => {
+  if (window.__LF_INIT) await window.__LF_INIT;
   // ============================================================================
   // 1. Storage & Multi-Modal Synthesized WebAudio SFX (Zero External Files)
   // ============================================================================
@@ -406,7 +408,11 @@
     src.start(startT, offset, dur + 0.02);
   }
 
+  const sfxLog = [];
+  let simTimeMs = 0;
+
   function playWhoosh(power, omega = 6) {
+    sfxLog.push({ type: 'whoosh', t: simTimeMs / 1000, power, omega, waterPct });
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
     const spinBoost = Math.min(1.4, Math.abs(omega) / 8.5);
@@ -432,11 +438,12 @@
     }
   }
 
-  let lastThudMs = 0;
+  let lastThudMs = -999;
   function playThud(impulse, isGlass, isFlatBase = false) {
-    const nowMs = performance.now();
+    const nowMs = simTimeMs;
     if (nowMs - lastThudMs < 42 || impulse < 0.42) return;
     lastThudMs = nowMs;
+    sfxLog.push({ type: 'thud', t: simTimeMs / 1000, impulse, isGlass, isFlatBase, waterPct });
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
     const strength = Math.min(1.0, impulse / 8.2);
@@ -494,6 +501,7 @@
   }
 
   function playWin(isHighTier, curStreak = 1, isCap = false) {
+    sfxLog.push({ type: 'win', t: simTimeMs / 1000, isHighTier, streak: curStreak, isCap, skin: skinMode });
     const c = ensureAudio(); if (!c) return;
     const now = c.currentTime;
     const semiShift = Math.min(7, Math.max(0, curStreak - 1));
@@ -563,14 +571,15 @@
 
   const SKINS = ['studio', 'mac', 'gb'];
   const SKIN_NAMES = { studio: '📷 原彩', mac: '🍎 麦金塔', gb: '👾 掌机' };
-  const WALLPAPERS = ['fuji', 'clearday', 'valley', 'evening', 'pier'];
+  const WALLPAPERS = ['wave', 'starry', 'qianli', 'fuji', 'monet', 'wheat'];
   const DESK_THEMES = {
-    fuji:     { top0: '#be836f', top1: '#d99e88', lip: '#f2bca4', ap0: '#78463e', ap1: '#59312e', ap2: '#331a1c', cTop: '#ecc5ad', cRim: '#753f34' },
-    clearday: { top0: '#c48b5a', top1: '#dfa878', lip: '#f0be90', ap0: '#8c5630', ap1: '#734424', ap2: '#4e2d16', cTop: '#e6be94', cRim: '#8c522b' },
-    valley:   { top0: '#b5786a', top1: '#cf9280', lip: '#e8ae9b', ap0: '#6b3b3e', ap1: '#4f2a33', ap2: '#291520', cTop: '#e3b6a4', cRim: '#69363a' },
-    evening:  { top0: '#967078', top1: '#b0888f', lip: '#cba3a8', ap0: '#543846', ap1: '#3e2836', ap2: '#221520', cTop: '#d6b2b6', cRim: '#523442' },
-    pier:     { top0: '#ab7e60', top1: '#c79776', lip: '#e3b492', ap0: '#614234', ap1: '#473026', ap2: '#261915', cTop: '#dfc0a4', cRim: '#634130' },
-    custom:   { top0: '#b8845c', top1: '#d49d72', lip: '#ebb68a', ap0: '#7d4d2d', ap1: '#613a21', ap2: '#3d2313', cTop: '#e6be94', cRim: '#804c28' }
+    wave:   { top0: '#c89b6e', top1: '#e0b78a', lip: '#f3cfa4', ap0: '#7b5335', ap1: '#5d3d26', ap2: '#362113', cTop: '#ebd0ae', cRim: '#7a4e2d' },
+    starry: { top0: '#8a6f5a', top1: '#a68972', lip: '#c4a78e', ap0: '#4a3a34', ap1: '#352927', ap2: '#1d1618', cTop: '#d4beab', cRim: '#523c33' },
+    qianli: { top0: '#9e7348', top1: '#ba8d5e', lip: '#d4a97a', ap0: '#5e3d22', ap1: '#452b17', ap2: '#26170b', cTop: '#dec09a', cRim: '#694221' },
+    fuji:   { top0: '#b87658', top1: '#d49072', lip: '#ebb094', ap0: '#753f2c', ap1: '#572d1f', ap2: '#331911', cTop: '#e8c1ab', cRim: '#783d28' },
+    monet:  { top0: '#9e826e', top1: '#b89c88', lip: '#d1b7a3', ap0: '#5c493e', ap1: '#43352d', ap2: '#261e1a', cTop: '#d9c5b4', cRim: '#5e483b' },
+    wheat:  { top0: '#c79658', top1: '#e0b070', lip: '#f5ca8e', ap0: '#825628', ap1: '#63401c', ap2: '#3b250f', cTop: '#edd0a4', cRim: '#825324' },
+    custom: { top0: '#b8845c', top1: '#d49d72', lip: '#ebb68a', ap0: '#7d4d2d', ap1: '#613a21', ap2: '#3d2313', cTop: '#e6be94', cRim: '#804c28' }
   };
 
   let renderOnce = () => {};
@@ -616,8 +625,8 @@
   let transparentBg = urlParams.get('transparent') === '1';
   let skinMode = urlParams.get('skin') || Store.get('bf_skin', 'studio');
   if (!SKINS.includes(skinMode)) skinMode = 'studio';
-  let wpMode = urlParams.get('wp') || Store.get('bf_wp', 'fuji');
-  if (!WALLPAPERS.includes(wpMode) && wpMode !== 'custom') wpMode = 'fuji';
+  let wpMode = urlParams.get('wp') || Store.get('bf_wp', 'wave');
+  if (!WALLPAPERS.includes(wpMode) && wpMode !== 'custom') wpMode = 'wave';
   if (widgetMode) document.body.classList.add('widget-mode');
   if (transparentBg) document.documentElement.classList.add('transparent-bg');
 
@@ -741,13 +750,17 @@
       ? Math.round(bottleBody.GetPosition().x / COASTER_SPACING) * COASTER_SPACING
       : 0;
 
-    world = new b2World(new b2Vec2(0, -16.8));
-    window.world = world;
-
-    // Boundless Infinite Flatland ("大平地"): ZERO side air walls, ZERO ceiling!
-    // 800m-wide static slab that recenters seamlessly around the bottle as you explore (-∞, +∞).
-    groundCenterX = prevX;
-    groundBody = addStaticBox(groundCenterX, -0.5, 400.0, 0.5, 0.88, 0.0);
+    if (!world) {
+      world = new b2World(new b2Vec2(0, -16.8));
+      window.world = world;
+      groundCenterX = prevX;
+      groundBody = addStaticBox(groundCenterX, -0.5, 400.0, 0.5, 0.88, 0.0);
+    } else {
+      if (bottleBody) { world.DestroyBody(bottleBody); bottleBody = null; }
+      if (particleSystem) { world.DestroyParticleSystem(particleSystem); particleSystem = null; }
+      groundCenterX = prevX;
+      groundBody.SetTransform(new b2Vec2(groundCenterX, -0.5), 0);
+    }
 
     const spawnY = BOTTLES[bottleKey].halfH + 0.01;
     createBottleAndWater(prevX, spawnY);
@@ -884,7 +897,7 @@
     if (!bottleBody) return false;
     if (state === 'ready') return true;
     // Only allow early re-grab if clearly lying sideways (> 64°) and slow — NEVER interrupt an active upright/edge wobble!
-    if (performance.now() - throwTime > 340) {
+    if (simTimeMs - throwTime > 340) {
       const pos = bottleBody.GetPosition();
       const vel = bottleBody.GetLinearVelocity();
       const av = bottleBody.GetAngularVelocity();
@@ -959,7 +972,7 @@
     renderAlpha = 1.0;
 
     state = 'flying';
-    throwTime = performance.now();
+    throwTime = simTimeMs;
     settleTimer = 0;
     startAngle = curAng;
     lastBottleAngle = bottleBody.GetAngle();
@@ -1082,7 +1095,7 @@
     const dvX = Math.abs(vel.x - prevVelX);
     const dvY = Math.max(0, vel.y - prevVelY);
     const dOm = Math.abs(av - prevOmega);
-    if (performance.now() - throwTime > 45) {
+    if (simTimeMs - throwTime > 45) {
       const impact = Math.hypot(dvX > 1.0 ? dvX : 0, dvY) + (dOm > 2.4 ? dOm * 0.22 : 0);
       if (impact > 0.45 && pos.y < cfg.halfH + 0.35) {
         playThud(impact, cfg.isGlass, tiltFromVertical < 0.28);
@@ -1101,7 +1114,7 @@
     const heightOffDesk = pos.y - restingDist;
     if (heightOffDesk > peakAirHeight) peakAirHeight = heightOffDesk;
 
-    if (state === 'flying' && (performance.now() - throwTime > 260)) {
+    if (state === 'flying' && (simTimeMs - throwTime > 260)) {
       if (heightOffDesk < 0.14 && peakAirHeight > 0.14) {
         if (!touchedDown) {
           touchedDown = true;
@@ -1117,7 +1130,7 @@
       // which previously triggered premature failure BEFORE the bottle rocked back upright!
       const stableStanding = tiltFromVertical < 0.15 && heightOffDesk < 0.15 && spd < 0.65 && Math.abs(av) < 0.85;
       const stableSideways = (absA > 1.17 && absA < 2.02) && heightOffDesk < 0.16 && spd < 0.22 && Math.abs(av) < 0.28;
-      const safetyFallback = (performance.now() - throwTime > 12000) && heightOffDesk < 0.18 && spd < 0.05 && Math.abs(av) < 0.05;
+      const safetyFallback = (simTimeMs - throwTime > 12000) && heightOffDesk < 0.18 && spd < 0.05 && Math.abs(av) < 0.05;
 
       if (stableStanding || stableSideways || safetyFallback) {
         settleTimer += realDt;
@@ -1320,21 +1333,20 @@
     }
 
     const hc = skinMode !== 'studio';
-    const wpImg = wpCache[wpMode] || wpCache.fuji;
+    const wpImg = wpCache[wpMode] || wpCache.wave;
     const deskY = w2s(0, 0).y;
 
     if (wpImg) {
-      // Seamless Mirrored Horizon-Parallax Wallpaper Tiling across (-∞, +∞)!
-      // Even tiles draw normally, odd tiles mirror horizontally so every boundary is 100% C0 seamless!
-      const drawH = Math.max(H, deskY + 36);
+      // Frame full painting height cleanly in the wall space above the wooden desk!
+      const drawH = Math.max(260, Math.ceil(deskY + 34));
       const aspect = wpImg.width / Math.max(1, wpImg.height);
-      const tileW = Math.max(W, Math.ceil(drawH * aspect));
-      const parallaxPx = camX * scale * 0.14;
+      const tileW = Math.ceil(drawH * aspect);
+      const parallaxPx = camX * scale * 0.16;
       const startTile = Math.floor((-parallaxPx - W * 0.5) / tileW) - 1;
       const endTile = Math.ceil((W - parallaxPx) / tileW) + 1;
 
       // Subtle vertical parallax drift when bottle flies sky-high
-      const skyLift = Math.min(0, Math.max(-drawH * 0.12, (camY - 1.52) * scale * 0.06));
+      const skyLift = Math.min(0, Math.max(-28, (camY - 1.52) * scale * 0.04)) - 6;
 
       ctx.save();
       for (let ti = startTile; ti <= endTile; ti++) {
@@ -1378,7 +1390,7 @@
   function drawDeskAndCoaster() {
     const scale = ppm * camZoom;
     const hc = skinMode !== 'studio' && !xrayMode;
-    const thm = DESK_THEMES[wpMode] || DESK_THEMES.fuji;
+    const thm = DESK_THEMES[wpMode] || DESK_THEMES.wave;
     const topY = w2s(0, 0).y;
     const ph = Math.max(H - topY + 20, 1.3 * scale);
     const backDepth = Math.max(14, scale * 0.24);
@@ -2095,7 +2107,7 @@
   }
 
   renderOnce = function(dt = 0) {
-    const nowSec = performance.now() * 0.001;
+    const nowSec = simTimeMs * 0.001;
     drawBackground(nowSec);
     drawDeskAndCoaster();
     drawBottleAndFluid();
@@ -2105,24 +2117,92 @@
     drawConfetti(dt);
   };
 
-  rebuildWorld();
-  let lastT = performance.now();
-  function frame(now) {
-    const dt = Math.min(0.05, (now - lastT) / 1000);
-    lastT = now;
+  const directorMode = urlParams.get('director') === '1';
+  let bannerState = null;
+  const origShowBanner = showScoreBanner;
+  showScoreBanner = function(pts, mainTitle, tags, ptsColor = '#ffd166') {
+    bannerState = { pts, mainTitle, tags, ptsColor, untilMs: simTimeMs + 2400 };
+    origShowBanner(pts, mainTitle, tags, ptsColor);
+  };
 
+  function advanceSim(dt) {
+    simTimeMs += dt * 1000;
     if (spaceCharging) spaceChargeT += dt;
     stepPhysics(dt);
-
     const camK = 1.0 - Math.exp(-9.5 * dt);
     camX += (targetCamX - camX) * camK;
     camY += (targetCamY - camY) * camK;
     camZoom += (targetCamZoom - camZoom) * camK;
-
     renderOnce(dt);
+  }
+
+  window.BF_API = {
+    canvas,
+    sfxLog,
+    getHud: () => ({
+      totalScore, bestShot, streak, bestStreak, capCount, maxExpeditionM,
+      waterPct, bottleKey, skinMode, wpMode, xrayMode, widgetMode,
+      banner: (bannerState && simTimeMs < bannerState.untilMs) ? bannerState : null,
+      phys: bottleBody ? {
+        pCount: particleSystem ? particleSystem.GetPositionBuffer().length / 2 : 0,
+        omega: bottleBody.GetAngularVelocity(),
+        deg: normalizeAngle(bottleBody.GetAngle()) * 180 / Math.PI
+      } : null
+    }),
+    setConfig: ({ bottle, water, skin, wp, xray, widget, spawnAtX }) => {
+      if (bottle && BOTTLES[bottle]) {
+        bottleKey = bottle;
+        document.querySelectorAll('.b-btn').forEach(x => x.classList.toggle('active', x.dataset.type === bottle));
+      }
+      if (water !== undefined) {
+        waterPct = water;
+        slider.value = water;
+        syncWaterBadge();
+      }
+      if (skin) setSkin(skin);
+      if (wp) setWallpaper(wp);
+      if (xray !== undefined) { xrayMode = xray; document.getElementById('btn-xray').classList.toggle('active', xray); }
+      if (widget !== undefined) { widgetMode = widget; document.body.classList.toggle('widget-mode', widget); }
+      rebuildWorld(false);
+      if (spawnAtX !== undefined) {
+        if (bottleBody) world.DestroyBody(bottleBody);
+        if (particleSystem) world.DestroyParticleSystem(particleSystem);
+        groundCenterX = spawnAtX;
+        groundBody.SetTransform(new b2Vec2(groundCenterX, -0.5), 0);
+        createBottleAndWater(spawnAtX, BOTTLES[bottleKey].halfH + 0.01);
+        const ip = bottleBody.GetPosition();
+        prevRenderX = currRenderX = ip.x; prevRenderY = currRenderY = ip.y; prevRenderAng = currRenderAng = 0;
+        camX = targetCamX = spawnAtX;
+      }
+      bannerState = null;
+      confetti.length = 0;
+      for (let i = 0; i < 15; i++) { stepSingleFixed(); }
+      renderOnce(0);
+    },
+    setAimDrag: (active, sx = 0, sy = 0, cx = 0, cy = 0) => {
+      dragging = active;
+      dragStart = { x: sx, y: sy };
+      dragCur = { x: cx, y: cy };
+    },
+    launch: (vx, vy, omega, power = 0.75) => {
+      dragging = false;
+      sfxEnabled = false; // record clean sfxLog for offline 48kHz master synth!
+      launchBottle(vx, vy, omega, power);
+    },
+    stepFrame: (dt = 1 / 60) => advanceSim(dt),
+    ready: () => Object.values(spriteCache).every(e => e.backImg && e.frontImg) && Object.keys(wpCache).length >= 5
+  };
+
+  rebuildWorld();
+  let lastT = performance.now();
+  function frame(now) {
+    if (directorMode) return;
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    advanceSim(dt);
     requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
+  if (!directorMode) requestAnimationFrame(frame);
 })();
 </script>
 </body>
